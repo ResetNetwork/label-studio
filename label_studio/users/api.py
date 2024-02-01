@@ -3,7 +3,7 @@
 import logging
 
 import drf_yasg.openapi as openapi
-from core.permissions import ViewClassPermission, all_permissions
+from core.permissions import ViewClassPermission, all_permissions,check_reset_superusers
 from django.utils.decorators import method_decorator
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import generics, viewsets
@@ -163,6 +163,8 @@ class UserAPI(viewsets.ModelViewSet):
         return result
 
     def destroy(self, request, *args, **kwargs):
+        if not check_reset_superusers(request):
+            return Response({'detail': 'You do not have permissions.'}, status=403)
         return super(UserAPI, self).destroy(request, *args, **kwargs)
 
 

@@ -1,6 +1,6 @@
 import logging
 
-from core.permissions import ViewClassPermission, all_permissions
+from core.permissions import ViewClassPermission, all_permissions, check_reset_superusers
 from django.db.models import CharField, Count, Q
 from django.db.models.functions import Cast
 from django.utils.decorators import method_decorator
@@ -174,6 +174,8 @@ class LabelLinkAPI(viewsets.ModelViewSet):
 
     @api_webhook_for_delete('LABEL_LINK_DELETED')
     def destroy(self, request, *args, **kwargs):
+        if not check_reset_superusers(request):
+            return Response({'detail': 'You do not have permissions.'}, status=403)
         return super().destroy(request, *args, **kwargs)
 
 

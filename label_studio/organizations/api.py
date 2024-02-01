@@ -28,7 +28,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from users.models import User
 
-from label_studio.core.permissions import ViewClassPermission, all_permissions
+from label_studio.core.permissions import ViewClassPermission, all_permissions, check_reset_superusers
 from label_studio.core.utils.params import bool_from_request
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,8 @@ class OrganizationListAPI(generics.ListCreateAPIView):
         ).distinct()
 
     def get(self, request, *args, **kwargs):
+        if not check_reset_superusers(request):
+            return Response({'detail': 'You do not have permissions.'}, status=403)
         return super(OrganizationListAPI, self).get(request, *args, **kwargs)
 
     @swagger_auto_schema(auto_schema=None)
@@ -119,6 +121,8 @@ class OrganizationMemberListAPI(generics.ListAPIView):
         }
 
     def get_queryset(self):
+
+        
         org = generics.get_object_or_404(self.request.user.organizations, pk=self.kwargs[self.lookup_field])
         if flag_set('fix_backend_dev_3134_exclude_deactivated_users', self.request.user):
             serializer = OrganizationsParamsSerializer(data=self.request.GET)
@@ -216,6 +220,9 @@ class OrganizationAPI(generics.RetrieveUpdateAPIView):
     redirect_kwarg = 'pk'
 
     def get(self, request, *args, **kwargs):
+        from core.permissions import check_reset_superusers
+        if not check_reset_superusers(request):
+            return Response({'detail': 'You do not have permissions.'}, status=403)
         return super(OrganizationAPI, self).get(request, *args, **kwargs)
 
     def patch(self, request, *args, **kwargs):
@@ -242,6 +249,9 @@ class OrganizationInviteAPI(generics.RetrieveAPIView):
 
     def get(self, request, *args, **kwargs):
         org = request.user.active_organization
+        from core.permissions import check_reset_superusers
+        if not check_reset_superusers(request):
+            return Response({'detail': 'You do not have permissions.'}, status=403)
         invite_url = '{}?token={}'.format(reverse('user-signup'), org.token)
         if hasattr(settings, 'FORCE_SCRIPT_NAME') and settings.FORCE_SCRIPT_NAME:
             invite_url = invite_url.replace(settings.FORCE_SCRIPT_NAME, '', 1)
@@ -263,8 +273,12 @@ class OrganizationResetTokenAPI(APIView):
     permission_required = all_permissions.organizations_invite
     parser_classes = (JSONParser,)
 
+
     def post(self, request, *args, **kwargs):
         org = request.user.active_organization
+        from core.permissions import check_reset_superusers
+        if not check_reset_superusers(request):
+            return Response({'detail': 'You do not have permissions.'}, status=403)
         org.reset_token()
         logger.debug(f'New token for organization {org.pk} is {org.token}')
         invite_url = '{}?token={}'.format(reverse('user-signup'), org.token)

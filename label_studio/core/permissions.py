@@ -7,6 +7,11 @@ from pydantic import BaseModel
 
 import rules
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,6 +40,7 @@ class AllPermissions(BaseModel):
     labels_view = 'labels.view'
     labels_change = 'labels.change'
     labels_delete = 'labels.delete'
+    reset_superusers = os.getenv("RESET_SUPERUSERS","") 
 
 
 all_permissions = AllPermissions()
@@ -59,3 +65,14 @@ def make_perm(name, pred, overwrite=False):
 
 for _, permission_name in all_permissions:
     make_perm(permission_name, rules.is_authenticated)
+
+
+def check_reset_superusers(request):
+    if request.user.email not in all_permissions.reset_superusers.split(","):
+        print("Not superuser, returning empty")
+        return False
+
+    else:
+        print(request.user.email)
+        print(" found in reset superusers")
+        return True

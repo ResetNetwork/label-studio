@@ -5,7 +5,7 @@ import logging
 import drf_yasg.openapi as openapi
 from core.feature_flags import flag_set
 from core.mixins import GetParentObjectMixin
-from core.permissions import ViewClassPermission, all_permissions
+from core.permissions import ViewClassPermission, all_permissions, check_reset_superusers
 from core.utils.common import DjangoFilterDescriptionInspector
 from core.utils.params import bool_from_request
 from data_manager.api import TaskListAPI as DMTaskListAPI
@@ -243,6 +243,8 @@ class TaskAPI(generics.RetrieveUpdateDestroyAPIView):
 
     @api_webhook_for_delete(WebhookAction.TASKS_DELETED)
     def delete(self, request, *args, **kwargs):
+        if not check_reset_superusers(request):
+            return Response({'detail': 'You do not have permissions.'}, status=403)
         return super(TaskAPI, self).delete(request, *args, **kwargs)
 
     @swagger_auto_schema(auto_schema=None)
@@ -322,6 +324,9 @@ class AnnotationAPI(generics.RetrieveUpdateDestroyAPIView):
 
     @api_webhook_for_delete(WebhookAction.ANNOTATIONS_DELETED)
     def delete(self, request, *args, **kwargs):
+        from core.permissions import check_reset_superusers
+        if not check_reset_superusers(request):
+            return Response({'detail': 'You do not have permissions.'}, status=403)
         return super(AnnotationAPI, self).delete(request, *args, **kwargs)
 
 
