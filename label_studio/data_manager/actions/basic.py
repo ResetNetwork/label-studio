@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 
-from core.permissions import AllPermissions
+from core.permissions import AllPermissions, check_reset_superusers
 from core.redis import start_job_async_or_sync
 from core.utils.common import load_func
 from data_manager.functions import evaluate_predictions
@@ -34,6 +34,8 @@ def delete_tasks(project, queryset, **kwargs):
     :param project: project instance
     :param queryset: filtered tasks db queryset
     """
+    if not check_reset_superusers(kwargs.get('request')):
+        return {'processed_items': 0, 'reload':False,'detail': 'You do not have permissions.'}
     tasks_ids = list(queryset.values('id'))
     count = len(tasks_ids)
     tasks_ids_list = [task['id'] for task in tasks_ids]
@@ -75,6 +77,8 @@ def delete_tasks_annotations(project, queryset, **kwargs):
     :param project: project instance
     :param queryset: filtered tasks db queryset
     """
+    if not check_reset_superusers(kwargs.get('request')):
+        return {'processed_items': 0, 'reload':False,'detail': 'You do not have permissions.'}
     task_ids = queryset.values_list('id', flat=True)
     annotations = Annotation.objects.filter(task__id__in=task_ids)
     count = annotations.count()
@@ -114,6 +118,8 @@ def delete_tasks_predictions(project, queryset, **kwargs):
     :param project: project instance
     :param queryset: filtered tasks db queryset
     """
+    if not check_reset_superusers(kwargs.get('request')):
+        return {'processed_items': 0, 'reload':False,'detail': 'You do not have permissions.'}
     task_ids = queryset.values_list('id', flat=True)
     predictions = Prediction.objects.filter(task__id__in=task_ids)
     real_task_ids = set(list(predictions.values_list('task__id', flat=True)))

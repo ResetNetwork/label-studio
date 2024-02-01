@@ -8,7 +8,7 @@ import drf_yasg.openapi as openapi
 from core.filters import ListFilter
 from core.label_config import config_essential_data_has_changed
 from core.mixins import GetParentObjectMixin
-from core.permissions import ViewClassPermission, all_permissions
+from core.permissions import ViewClassPermission, all_permissions, check_reset_superusers
 from core.utils.common import paginator, paginator_help, temporary_disconnect_all_signals
 from core.utils.exceptions import LabelStudioDatabaseException, ProjectExistException
 from core.utils.io import find_dir, find_file, read_yaml
@@ -229,6 +229,8 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
 
     @api_webhook_for_delete(WebhookAction.PROJECT_DELETED)
     def delete(self, request, *args, **kwargs):
+        if not check_reset_superusers(request):
+            return Response({'detail': 'You do not have permissions.'}, status=403)
         return super(ProjectAPI, self).delete(request, *args, **kwargs)
 
     @api_webhook(WebhookAction.PROJECT_UPDATED)
