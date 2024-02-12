@@ -33,6 +33,7 @@ from tasks.models import Annotation
 from users.models import User
 
 from label_studio.core.permissions import ViewClassPermission, all_permissions
+from label_studio.core.api_permissions import SuperUserInvitePermission
 from label_studio.core.utils.params import bool_from_request
 
 logger = logging.getLogger(__name__)
@@ -357,7 +358,8 @@ class OrganizationAPI(generics.RetrieveUpdateAPIView):
 class OrganizationInviteAPI(generics.RetrieveAPIView):
     parser_classes = (JSONParser,)
     queryset = Organization.objects.all()
-    permission_required = all_permissions.organizations_invite
+    permission_required = all_permissions.organizations_change
+    permission_classes = (IsAuthenticated, SuperUserInvitePermission)
 
     def get(self, request, *args, **kwargs):
         org = request.user.active_organization
