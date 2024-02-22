@@ -13,6 +13,21 @@ class SuperUserInvitePermission(BasePermission):
         return True
 
 
+class UserWithEditPermission(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        # Super user has all access
+        if request.user.is_reset_super_user:
+            return True
+
+        # If not super user and method is not in allowed methods return false
+        USER_EDIT_PERMISSION_METHODS = ('GET', 'PUT', 'PATCH', 'HEAD', 'OPTIONS')
+        if request.method not in USER_EDIT_PERMISSION_METHODS:
+            return False
+
+        # A normal user can only update their own profile
+        return obj == request.user
+
+
 class SuperUserPermission(BasePermission):
     def has_object_permission(self, request, view, obj):
         if ( request.method
