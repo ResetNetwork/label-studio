@@ -3,6 +3,7 @@
 import logging
 
 from core.permissions import ViewClassPermission, all_permissions
+from core.api_permissions import UserWithEditPermission
 from django.utils.decorators import method_decorator
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
@@ -176,7 +177,7 @@ class UserAPI(viewsets.ModelViewSet):
         PATCH=all_permissions.organizations_view,
         DELETE=all_permissions.organizations_change,
     )
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, UserWithEditPermission)
     http_method_names = ['get', 'post', 'head', 'patch', 'delete']
 
     def get_queryset(self):
