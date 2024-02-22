@@ -4,6 +4,7 @@ import logging
 
 import drf_yasg.openapi as openapi
 from core.permissions import ViewClassPermission, all_permissions
+from core.api_permissions import UserWithEditPermission
 from django.utils.decorators import method_decorator
 from drf_yasg.utils import no_body, swagger_auto_schema
 from rest_framework import generics, viewsets
@@ -135,7 +136,7 @@ class UserAPI(viewsets.ModelViewSet):
         PATCH=all_permissions.organizations_view,
         DELETE=all_permissions.organizations_change,
     )
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, UserWithEditPermission)
     http_method_names = ['get', 'post', 'head', 'patch', 'delete']
 
     def get_queryset(self):
