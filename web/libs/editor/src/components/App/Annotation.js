@@ -9,7 +9,6 @@ export function Annotation({ annotation, root }) {
         annotation.resetReady();
       }
     };
-  }, [annotation?.pk, annotation?.id]);
-
+  }, [annotation.pk, annotation.id]);
   return root ? Tree.renderItem(root, annotation) : null;
 }
