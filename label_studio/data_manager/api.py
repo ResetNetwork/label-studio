@@ -28,9 +28,11 @@ from projects.serializers import ProjectSerializer
 from rest_framework import generics, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from tasks.models import Annotation, Prediction, Task
+from core.api_permissions import AnnotationsPermission
 
 logger = logging.getLogger(__name__)
 
@@ -526,6 +528,7 @@ class ProjectActionsAPI(APIView):
         GET=all_permissions.projects_view,
         POST=all_permissions.projects_view,
     )
+    permission_classes = (IsAuthenticated, AnnotationsPermission)
 
     def get(self, request):
         pk = int_from_request(request.GET, 'project', 1)  # replace 1 to None, it's for debug only
