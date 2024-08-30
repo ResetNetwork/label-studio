@@ -5,7 +5,7 @@ import { useLayoutEffect } from 'react';
 export function Annotation({ annotation, root }) {
   const addedScripts = [];
 
-    (() => {
+  useLayoutEffect(() => {
     const platforms = {
       Twitter: { regex: /twitter\.com/, script: 'https://platform.twitter.com/widgets.js' },
       TikTok: { regex: /tiktok-embed/, script: 'https://www.tiktok.com/embed.js' },
