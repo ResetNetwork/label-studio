@@ -20,7 +20,7 @@ class UserWithEditPermission(BasePermission):
             return True
 
         # If not super user and method is not in allowed methods return false
-        USER_EDIT_PERMISSION_METHODS = ('GET', 'PUT', 'PATCH', 'HEAD', 'OPTIONS')
+        USER_EDIT_PERMISSION_METHODS = ("GET", "PUT", "PATCH", "HEAD", "OPTIONS")
         if request.method not in USER_EDIT_PERMISSION_METHODS:
             return False
 
@@ -34,7 +34,11 @@ class AnnotationsPermission(BasePermission):
         if request.user.is_reset_super_user:
             return True
 
-        ANNOTATION_PERMISSION_METHODS = ('GET', 'PUT', 'PATCH', 'POST', 'HEAD', 'OPTIONS')
+        # Allow non-superusers to modify, delete, and create views
+        if getattr(view, "action", None) in ["create", "update", "partial_update", "destroy"]:
+            return True
+
+        ANNOTATION_PERMISSION_METHODS = ("GET", "PUT", "PATCH", "POST", "HEAD", "OPTIONS")
         if request.method in ANNOTATION_PERMISSION_METHODS:
             return True
 
@@ -45,7 +49,11 @@ class AnnotationsPermission(BasePermission):
         if request.user.is_reset_super_user:
             return True
 
-        ANNOTATION_PERMISSION_METHODS = ('GET', 'PUT', 'PATCH', 'POST', 'HEAD', 'OPTIONS')
+        # Allow non-superusers to modify, delete, and create views
+        if getattr(view, "action", None) in ["create", "update", "partial_update", "destroy"]:
+            return True
+
+        ANNOTATION_PERMISSION_METHODS = ("GET", "PUT", "PATCH", "POST", "HEAD", "OPTIONS")
         if request.method in ANNOTATION_PERMISSION_METHODS:
             return True
         return False
@@ -53,18 +61,12 @@ class AnnotationsPermission(BasePermission):
 
 class SuperUserPermission(BasePermission):
     def has_object_permission(self, request, view, obj):
-        if ( request.method
-            not in SAFE_METHODS and
-            not request.user.is_reset_super_user
-        ):
+        if request.method not in SAFE_METHODS and not request.user.is_reset_super_user:
             return False
         return obj.has_permission(request.user)
 
     def has_permission(self, request, view):
-        if ( request.method
-            not in SAFE_METHODS and
-            not request.user.is_reset_super_user
-        ):
+        if request.method not in SAFE_METHODS and not request.user.is_reset_super_user:
             return False
         return True
 
@@ -76,10 +78,10 @@ class HasObjectPermission(BasePermission):
 
 class MemberHasOwnerPermission(BasePermission):
     def has_object_permission(self, request, view, obj):
-        if ( request.method
-            not in SAFE_METHODS and
-            not request.user.own_organization and
-            not request.user.is_reset_super_user
+        if (
+            request.method not in SAFE_METHODS
+            and not request.user.own_organization
+            and not request.user.is_reset_super_user
         ):
             return False
 
