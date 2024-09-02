@@ -31,12 +31,16 @@ class UserWithEditPermission(BasePermission):
 class AnnotationsPermission(BasePermission):
     def has_object_permission(self, request, view, obj):
         # Super user has all access
-        if request.user.is_reset_super_user:
+        if request.user.is_superuser:
             return True
 
-        # Allow non-superusers to modify, delete, and create views
-        if getattr(view, "action", None) in ["create", "update", "partial_update", "destroy"]:
+        # Allow non-superusers to create, update, and partially update annotations
+        if getattr(view, "action", None) in ["create", "update", "partial_update"]:
             return True
+
+        # Only superusers can delete annotations
+        if getattr(view, "action", None) == "destroy":
+            return False
 
         ANNOTATION_PERMISSION_METHODS = ("GET", "PUT", "PATCH", "POST", "HEAD", "OPTIONS")
         if request.method in ANNOTATION_PERMISSION_METHODS:
@@ -46,12 +50,16 @@ class AnnotationsPermission(BasePermission):
 
     def has_permission(self, request, view):
         # Super user has all access
-        if request.user.is_reset_super_user:
+        if request.user.is_superuser:
             return True
 
-        # Allow non-superusers to modify, delete, and create views
-        if getattr(view, "action", None) in ["create", "update", "partial_update", "destroy"]:
+        # Allow non-superusers to create, update, and partially update annotations
+        if getattr(view, "action", None) in ["create", "update", "partial_update"]:
             return True
+
+        # Only superusers can delete annotations
+        if getattr(view, "action", None) == "destroy":
+            return False
 
         ANNOTATION_PERMISSION_METHODS = ("GET", "PUT", "PATCH", "POST", "HEAD", "OPTIONS")
         if request.method in ANNOTATION_PERMISSION_METHODS:
