@@ -34,6 +34,9 @@ class AnnotationsPermission(BasePermission):
         if request.user.is_reset_super_user:
             return True
 
+        if getattr(view, "action", None) in ["create", "update", "partial_update"]:
+            return True
+
         ANNOTATION_PERMISSION_METHODS = ('GET', 'PUT', 'PATCH', 'POST', 'HEAD', 'OPTIONS')
         if request.method in ANNOTATION_PERMISSION_METHODS:
             return True
@@ -43,6 +46,9 @@ class AnnotationsPermission(BasePermission):
     def has_permission(self, request, view):
         # Super user has all access
         if request.user.is_reset_super_user:
+            return True
+
+        if getattr(view, "action", None) in ["create", "update", "partial_update"]:
             return True
 
         ANNOTATION_PERMISSION_METHODS = ('GET', 'PUT', 'PATCH', 'POST', 'HEAD', 'OPTIONS')
