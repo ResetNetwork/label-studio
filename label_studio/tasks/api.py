@@ -412,6 +412,8 @@ class AnnotationAPI(generics.RetrieveUpdateDestroyAPIView):
     queryset = Annotation.objects.all()
 
     def perform_destroy(self, annotation):
+        if not self.request.user.is_reset_super_user:
+            raise PermissionDenied("Only superusers can delete annotations.")
         annotation.delete()
 
     def update(self, request, *args, **kwargs):
