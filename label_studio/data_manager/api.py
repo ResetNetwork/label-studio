@@ -153,6 +153,8 @@ class ViewAPI(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
 
     @swagger_auto_schema(
         tags=['Data Manager'],
