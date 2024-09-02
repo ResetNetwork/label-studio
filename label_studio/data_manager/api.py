@@ -19,6 +19,7 @@ from data_manager.serializers import (
     ViewSerializer,
 )
 from django.conf import settings
+from django.core.paginator import EmptyPage
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
@@ -27,6 +28,7 @@ from projects.models import Project
 from projects.serializers import ProjectSerializer
 from rest_framework import generics, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -227,10 +229,13 @@ class TaskPagination(PageNumberPagination):
         return super().paginate_queryset(queryset, request, view)
 
     def paginate_queryset(self, queryset, request, view=None):
-        if flag_set('fflag_fix_back_leap_24_tasks_api_optimization_05092023_short'):
-            return self.async_paginate_queryset(queryset, request, view)
-        else:
-            return self.sync_paginate_queryset(queryset, request, view)
+        try:
+            if flag_set('fflag_fix_back_leap_24_tasks_api_optimization_05092023_short'):
+                return self.async_paginate_queryset(queryset, request, view)
+            else:
+                return self.sync_paginate_queryset(queryset, request, view)
+        except EmptyPage:
+            raise NotFound("Invalid page. That page contains no results.")
 
     def get_paginated_response(self, data):
         return Response(
