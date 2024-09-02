@@ -52,6 +52,7 @@ from label_studio_sdk._extensions.label_studio_tools.core.utils.exceptions impor
 from pkg_resources import parse_version
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import Response, exception_handler
 
 import label_studio
@@ -88,8 +89,20 @@ def custom_exception_handler(exc, context):
     :return: response with error desc
     """
     exception_id = uuid.uuid4()
-    logger.error('{} {}'.format(exception_id, exc), exc_info=True)
+    # Handle PermissionDenied exception
+    if isinstance(exc, PermissionDenied):
+        logger.warning(f"Permission denied at {context['view'].__class__.__name__}: {exc}")
+        response_data = {
+            "id": exception_id,
+            "status_code": status.HTTP_403_FORBIDDEN,
+            "version": label_studio.__version__,
+            "detail": "You do not have permission to perform this action.",
+            "exc_info": None,
+        }
+        return Response(status=status.HTTP_403_FORBIDDEN, data=response_data)
 
+    # Log other exceptions as errors
+    logger.error("{} {}".format(exception_id, exc), exc_info=True)
     exc = _override_exceptions(exc)
 
     # error body structure
