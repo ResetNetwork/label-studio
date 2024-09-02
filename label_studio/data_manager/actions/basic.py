@@ -16,6 +16,7 @@ from tasks.models import Annotation, AnnotationDraft, Prediction, Task
 from users.models import User
 from webhooks.models import WebhookAction
 from webhooks.utils import emit_webhooks_for_instance
+from rest_framework.exceptions import PermissionDenied
 
 all_permissions = AllPermissions()
 logger = logging.getLogger(__name__)
@@ -37,6 +38,9 @@ def delete_tasks(project, queryset, **kwargs):
     :param project: project instance
     :param queryset: filtered tasks db queryset
     """
+    request = kwargs["request"]
+    if not request.user.is_reset_super_user:
+        raise PermissionDenied("Only superusers can delete tasks.")
     tasks_ids = list(queryset.values('id'))
     count = len(tasks_ids)
     tasks_ids_list = [task['id'] for task in tasks_ids]
@@ -83,6 +87,10 @@ def delete_tasks_annotations(project, queryset, **kwargs):
     annotator_id = request.data.get('annotator')
 
     task_ids = queryset.values_list('id', flat=True)
+    request = kwargs["request"]
+    if not request.user.is_reset_super_user:
+        raise PermissionDenied("Only superusers can delete annotations.")
+    task_ids = queryset.values_list("id", flat=True)
     annotations = Annotation.objects.filter(task__id__in=task_ids)
     if annotator_id:
         annotations = annotations.filter(completed_by=int(annotator_id))
@@ -104,7 +112,6 @@ def delete_tasks_annotations(project, queryset, **kwargs):
     annotations.delete()
     drafts.delete()  # since task-level annotation drafts will not have been deleted by CASCADE
     emit_webhooks_for_instance(project.organization, project, WebhookAction.ANNOTATIONS_DELETED, annotations_ids)
-    request = kwargs['request']
 
     tasks = Task.objects.filter(id__in=real_task_ids)
     tasks.update(updated_at=datetime.now(), updated_by=request.user)
@@ -150,6 +157,9 @@ def delete_tasks_predictions(project, queryset, **kwargs):
     :param project: project instance
     :param queryset: filtered tasks db queryset
     """
+    request = kwargs["request"]
+    if not request.user.is_reset_super_user:
+        raise PermissionDenied("Only superusers can delete predictions.")
     task_ids = queryset.values_list('id', flat=True)
     predictions = Prediction.objects.filter(task__id__in=task_ids)
     if flag_set('fflag_root_223_optimize_delete_predictions', organization=project.organization):

@@ -167,6 +167,11 @@ class ViewAPI(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    def destroy(self, request, *args, **kwargs):
+        if not request.user.is_reset_super_user:
+            return Response({"detail": "You do not have permission to delete this entry."}, status=403)
+        return super().destroy(request, *args, **kwargs)
+
     @extend_schema(
         tags=['Data Manager'],
         summary='Delete all project views',
@@ -188,6 +193,8 @@ class ViewAPI(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['delete'], permission_required=all_permissions.views_reset)
     def reset(self, request):
+        if not request.user.is_reset_super_user:
+            return Response({"detail": "You do not have permission to delete these entries."}, status=403)
         # Note: OpenAPI 3.0 does not support request body for DELETE requests
         # see https://github.com/tfranzel/drf-spectacular/issues/431#issuecomment-862738643
         # as a hack for the SDK, fallback to query params if request body is empty
