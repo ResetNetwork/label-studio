@@ -155,6 +155,7 @@ class ViewAPI(viewsets.ModelViewSet):
     serializer_class = ViewSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['project']
+    permission_classes = [IsAuthenticated, AnnotationsPermission]
     permission_required = ViewClassPermission(
         GET=all_permissions.views_view,
         POST=all_permissions.views_create,
