@@ -51,7 +51,7 @@ from label_studio_sdk._extensions.label_studio_tools.core.utils.exceptions impor
 from packaging.version import parse as parse_version
 from pyboxen import boxen
 from rest_framework import status
-from rest_framework.exceptions import APIException, ErrorDetail
+from rest_framework.exceptions import APIException, ErrorDetail, PermissionDenied
 from rest_framework.views import Response, exception_handler
 
 import label_studio
@@ -90,6 +90,17 @@ def custom_exception_handler(exc, context):
     exception_id = uuid.uuid4()
 
     sentry_skip = False
+    if isinstance(exc, PermissionDenied):
+        logger.warning(f"Permission denied at {context['view'].__class__.__name__}: {exc}")
+        response_data = {
+            "id": exception_id,
+            "status_code": status.HTTP_403_FORBIDDEN,
+            "version": label_studio.__version__,
+            "detail": "You do not have permission to perform this action.",
+            "exc_info": None,
+        }
+        return Response(status=status.HTTP_403_FORBIDDEN, data=response_data)
+
     if isinstance(exc, APIException) and exc.status_code < 500:
         # Skipping Sentry for non-500 unhandled exceptions
         sentry_skip = True
@@ -99,7 +110,6 @@ def custom_exception_handler(exc, context):
         exc_info=True,
         extra={'sentry_skip': sentry_skip, 'exception_id': exception_id},
     )
-
     exc = _override_exceptions(exc)
 
     # error body structure
