@@ -19,7 +19,8 @@ from data_manager.serializers import (
     ViewSerializer,
 )
 from django.conf import settings
-from django.core.paginator import EmptyPage
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
@@ -234,14 +235,21 @@ class TaskPagination(PageNumberPagination):
         self.total_annotations = Annotation.objects.filter(task_id__in=queryset, was_cancelled=False).count()
         return super().paginate_queryset(queryset, request, view)
 
+    def paginate_totals_queryset(self, queryset, request, view=None):
+        totals = queryset.values('id').aggregate(
+            total_annotations=Coalesce(Sum('total_annotations'), 0),
+            total_predictions=Coalesce(Sum('total_predictions'), 0),
+        )
+        self.total_annotations = totals['total_annotations']
+        self.total_predictions = totals['total_predictions']
+        return super().paginate_queryset(queryset, request, view)
+
     def paginate_queryset(self, queryset, request, view=None):
-        try:
-            if flag_set('fflag_fix_back_leap_24_tasks_api_optimization_05092023_short'):
-                return self.async_paginate_queryset(queryset, request, view)
-            else:
-                return self.sync_paginate_queryset(queryset, request, view)
-        except EmptyPage:
-            raise NotFound("Invalid page. That page contains no results.")
+        if flag_set('fflag_fix_back_optic_1407_optimize_tasks_api_pagination_counts'):
+            return self.paginate_totals_queryset(queryset, request, view)
+        if flag_set('fflag_fix_back_leap_24_tasks_api_optimization_05092023_short'):
+            return self.async_paginate_queryset(queryset, request, view)
+        return self.sync_paginate_queryset(queryset, request, view)
 
     def get_paginated_response(self, data):
         return Response(
