@@ -23,7 +23,9 @@
   <!-- CSS -->
   <link href="{{settings.HOSTNAME}}{% static 'css/uikit.css' %}" rel="stylesheet">
   <link href="{{settings.HOSTNAME}}{% static 'css/main.css' %}" rel="stylesheet">
-  <link href="{{settings.FRONTEND_HOSTNAME}}/react-app/main.css?v={{ versions.backend.commit }}" rel="stylesheet">
+  {% block app-css %}
+    <link href="{{settings.FRONTEND_HOSTNAME}}/react-app/main.css?v={{ versions.backend.commit }}" rel="stylesheet">
+  {% endblock %}
 
   {% block app-scripts %}
   {% endblock %}
@@ -43,10 +45,6 @@
   {% endblock %}
 
   {% block head %}
-  {% endblock %}
-
-  {% block head-toast %}
-    <link href="{{settings.HOSTNAME}}{% static 'css/Toast.min.css' %}" rel="stylesheet">
   {% endblock %}
 
   {% get_current_language as LANGUAGE_CODE %}
@@ -104,11 +102,13 @@
     feature_flags: {{ feature_flags|json_dumps_ensure_ascii|safe }},
     feature_flags_default_value: {{ settings.FEATURE_FLAGS_DEFAULT_VALUE|json_dumps_ensure_ascii|safe }},
     server_id: {{ request.server_id|json_dumps_ensure_ascii|safe }},
+    collect_analytics: {{ settings.COLLECT_ANALYTICS|yesno:"true,false" }},
 
     {% block app_more_settings %}
       flags: {
-        allow_organization_webhooks: {{settings.ALLOW_ORGANIZATION_WEBHOOKS|yesno:"true,false"}}
-      }
+        allow_organization_webhooks: {{settings.ALLOW_ORGANIZATION_WEBHOOKS|yesno:"true,false"}},
+        storage_persistence: {{ settings.STORAGE_PERSISTENCE|yesno:"true,false" }}, 
+      },
     {% endblock %}
 
   }, {% block frontend_settings %}{}{% endblock %});
@@ -126,30 +126,30 @@
 
 {% block bottomjs %}
   <script src="{{settings.HOSTNAME}}{% static 'js/jquery.min.js' %}"></script>
-  <script src="{{settings.HOSTNAME}}{% static 'js/helpers.js' %}"></script>
-  <script src="{{settings.HOSTNAME}}{% static 'js/Toast.min.js' %}"></script>
   <script nonce="{{request.csp_nonce}}">
-      applyCsrf();
 
-      $('.message .close').on('click', function () {
-           $(this).closest('.message').transition('fade');
+    // CSRF
+    (function() {
+      function csrfSafeMethod(method) {
+        // these HTTP methods do not require CSRF protection
+        return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+      }
+
+      // Apply CSRF token
+      var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+      $.ajaxSetup({
+        beforeSend: function (xhr, settings) {
+          if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+          }
+        }
       });
+    })();
+
   </script>
 {% endblock %}
 
 <div id="dynamic-content">
-  {% block storage-persistence %}
-  <script nonce="{{request.csp_nonce}}">
-    {# storage persistence #}
-    {% if not settings.STORAGE_PERSISTENCE %}
-    new Toast({
-      message: `Data will be persisted on the node running this container,<br>
-                but all data will be lost if this node goes away.<br>`,
-      type: 'danger'
-    });
-    {% endif %}
-  </script>
-  {% endblock %}
 
   {% block billing-checks %}
   {% endblock %}

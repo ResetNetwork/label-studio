@@ -60,7 +60,7 @@ When you evaluate a prompt, you will see the following metrics:
     <tr>
       <th>Metric</th>
       <th>Tasks</th>
-      <th>Type</th>
+      <th>Config</th>
       <th>Description</th>
     </tr>
 </thead>
@@ -76,9 +76,7 @@ Ground Truths
 </td>
 <td>
 
-Text classification 
-
-NER
+All labeling configs
 
 </td>
 <td>
@@ -101,9 +99,7 @@ All task types
 </td>
 <td>
 
-Text classification 
-
-NER
+All labeling configs
 
 </td>
 <td>
@@ -124,9 +120,9 @@ Ground Truths
 </td>
 <td>
 
-Text classification
+Single `<Choices>`
 
-NER
+Single `<Labels>`
 
 </td>
 <td>
@@ -159,9 +155,7 @@ All task types
 </td>
 <td>
 
-Text classification 
-
-NER
+All labeling configs
 
 </td>
 <td>
@@ -171,6 +165,15 @@ The cost to run the prompt based on the number of tokens required.
 </td>
 </tr>
 </table>
+
+### Classification reports
+
+Click **Expand** to view classification reports for the Prompt. Thee reports tell you how many times each class was identified. This is available for the following tags:
+
+`Choices`  
+`Labels`  
+`Pairwise`  
+`Rating`
 
 ## Enhance prompt
 
@@ -193,8 +196,6 @@ The **Task Subset** is used as the context when auto-refining the prompt. If you
 Auto-refinement applies your initial prompt and the Teacher Model to generate predictions on the task subset (which will be ground truth tasks or a sample dataset). If applicable, predictions are then compared to the ground truth for accuracy. 
 
 Your Teacher Model evaluates the initial prompt’s predictions against the ground truth (or sample task output) and identifies areas for improvement. It then suggests a refined prompt, aimed at achieving closer alignment with the desired outcomes.
-
-
 
 
 ## Drafting effective prompts

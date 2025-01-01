@@ -1,6 +1,6 @@
 {
-  "message": "feat: LEAP-1599: Allow to edit TimelineRegion spans (#6577)",
-  "commit": "5ab2f79db0c6c0f2a36ac6de3e7012b23cad8f5b",
-  "date": "2024-11-06T11:43:23.000Z",
+  "message": "chore: OPTIC-1121: Removing Vite dependencies as they are unused (#6814)",
+  "commit": "c2de35e89944400e6897bb5046d7938e884e80e9",
+  "date": "2024-12-20T15:53:26.000Z",
   "branch": "develop"
 }

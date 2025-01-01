@@ -150,6 +150,12 @@
         "decorators": ""
     },
     {
+        "url": "/api/projects/counts/",
+        "module": "projects.api.ProjectCountsListAPI",
+        "name": "projects:api:project-counts-list",
+        "decorators": ""
+    },
+    {
         "url": "/api/projects/<int:pk>/next/",
         "module": "projects.api.ProjectNextTaskAPI",
         "name": "projects:api:project-next",
@@ -1701,6 +1707,18 @@
         "url": "/feature-flags/",
         "module": "core.views.feature_flags",
         "name": "feature_flags",
+        "decorators": ""
+    },
+    {
+        "url": "/heidi-tips/",
+        "module": "core.views.heidi_tips",
+        "name": "heidi_tips",
+        "decorators": ""
+    },
+    {
+        "url": "/__lsa/",
+        "module": "core.views.collect_metrics",
+        "name": "collect_metrics",
         "decorators": ""
     },
     {

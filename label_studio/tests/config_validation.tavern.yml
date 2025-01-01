@@ -1403,3 +1403,105 @@ stages:
     url: '{django_live_url}/api/projects/{pk}/import'
   response:
     status_code: 201
+
+---
+test_name: Validation should ignore xml comments
+strict: false
+marks:
+- usefixtures:
+  - django_live_url
+
+stages:
+- # Signup to the system
+  id: signup
+  type: ref
+- name: create project
+  request:
+    method: POST
+    url: '{django_live_url}/api/projects'
+    json:
+      label_config: <View> <Text name="text" value="$text"/><Taxonomy name="taxonomy" toName="text"><Choice value="A"><Choice value="A_1"/><Choice value="A_2"/></Choice><Choice value="B"/></Taxonomy></View>
+  response:
+    save:
+      json:
+        pk: id
+    status_code: 201
+- name: validate config will not throw config contains non-unique names error
+  request:
+    headers:
+      content-type: application/json
+    json:
+      label_config: '<View> <Text name="text" value="$text"/><Taxonomy name="taxonomy" toName="text"><Choice value="C"><Choice value="A_1"/><Choice value="A_2"/></Choice><Choice value="B"/></Taxonomy></View><!-- Custom script draft --><!-- const taxonomy = document.querySelector(`[name="taxonomy"]`);-->'
+    method: POST
+    url: '{django_live_url}/api/projects/{pk}/validate'
+  response:
+    status_code: 200
+
+---
+test_name: check_config_suitable_for_bulk_annotation
+strict: false
+marks:
+- usefixtures:
+  - django_live_url
+stages:
+
+- id: signup
+  type: ref
+
+- name: create classification project
+  request:
+    data:
+      label_config: |
+        <View>
+          <Text name="text" value="$text"/>
+          <Choices name="sentiment" toName="text" choice="single">
+            <Choice value="Positive"/>
+            <Choice value="Neutral"/>
+            <Choice value="Negative"/>
+          </Choices>
+        </View>
+    method: POST
+    url: '{django_live_url}/api/projects'
+  response:
+    status_code: 201
+    save:
+      json:
+        classification_project_id: id
+
+- name: check classification project property
+  request:
+    method: GET
+    url: '{django_live_url}/api/projects/{classification_project_id}'
+  response:
+    status_code: 200
+    json:
+      config_suitable_for_bulk_annotation: true
+
+- name: create object detection project
+  request:
+    data:
+      label_config: |
+        <View>
+          <Image name="image" value="$image"/>
+          <RectangleLabels name="label" toName="image">
+            <Label value="Car"/>
+            <Label value="Tree"/>
+            <Label value="Person"/>
+          </RectangleLabels>
+        </View>
+    method: POST
+    url: '{django_live_url}/api/projects'
+  response:
+    status_code: 201
+    save:
+      json:
+        detection_project_id: id
+
+- name: check object detection project property
+  request:
+    method: GET
+    url: '{django_live_url}/api/projects/{detection_project_id}'
+  response:
+    status_code: 200
+    json:
+      config_suitable_for_bulk_annotation: false

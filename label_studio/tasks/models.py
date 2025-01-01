@@ -28,10 +28,9 @@ from core.utils.params import get_env
 from data_import.models import FileUpload
 from data_manager.managers import PreparedTaskManager, TaskManager
 from django.conf import settings
-from django.contrib.auth.models import AnonymousUser
-from django.core.files.storage import default_storage
 from django.db import OperationalError, models, transaction
-from django.db.models import CheckConstraint, JSONField, Q
+from django.db.models import CheckConstraint, F, JSONField, Q
+from django.db.models.lookups import GreaterThanOrEqual
 from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import Signal, receiver
 from django.urls import reverse
@@ -451,13 +450,7 @@ class Task(TaskMixin, models.Model):
                     # permission check: resolve uploaded files to the project only
                     file_upload = fast_first(FileUpload.objects.filter(project=project, file=prepared_filename))
                     if file_upload is not None:
-                        if flag_set(
-                            'ff_back_dev_2915_storage_nginx_proxy_26092022_short',
-                            self.project.organization.created_by,
-                        ):
-                            task_data[field] = file_upload.url
-                        else:
-                            task_data[field] = default_storage.url(name=prepared_filename)
+                        task_data[field] = file_upload.url
                     # it's very rare case, e.g. user tried to reimport exported file from another project
                     # or user wrote his django storage path manually
                     else:
@@ -524,17 +517,16 @@ class Task(TaskMixin, models.Model):
         self.annotations.exclude(id=annotation_id).update(ground_truth=False)
 
     def save(self, *args, update_fields=None, **kwargs):
-        if flag_set('ff_back_2070_inner_id_12052022_short', AnonymousUser):
-            if self.inner_id == 0:
-                task = Task.objects.filter(project=self.project).order_by('-inner_id').first()
-                max_inner_id = 1
-                if task:
-                    max_inner_id = task.inner_id
+        if self.inner_id == 0:
+            task = Task.objects.filter(project=self.project).order_by('-inner_id').first()
+            max_inner_id = 1
+            if task:
+                max_inner_id = task.inner_id
 
-                # max_inner_id might be None in the old projects
-                self.inner_id = None if max_inner_id is None else (max_inner_id + 1)
-                if update_fields is not None:
-                    update_fields = {'inner_id'}.union(update_fields)
+            # max_inner_id might be None in the old projects
+            self.inner_id = None if max_inner_id is None else (max_inner_id + 1)
+            if update_fields is not None:
+                update_fields = {'inner_id'}.union(update_fields)
 
         super().save(*args, update_fields=update_fields, **kwargs)
 
@@ -757,7 +749,14 @@ class Annotation(AnnotationMixin, models.Model):
             self.updated_by = request.user
             if update_fields is not None:
                 update_fields = {'updated_by'}.union(update_fields)
+
+        unique_list = {result.get('id') for result in (self.result or [])}
+
+        self.result_count = len(unique_list)
+        if update_fields is not None:
+            update_fields = {'result_count'}.union(update_fields)
         result = super().save(*args, update_fields=update_fields, **kwargs)
+
         self.update_task()
         return result
 
@@ -1399,10 +1398,15 @@ def bulk_update_stats_project_tasks(tasks, project=None):
         maximum_annotations = project.maximum_annotations
         # update filters if we can use overlap
         if use_overlap:
-            # finished tasks
-            finished_tasks = tasks.filter(
-                Q(total_annotations__gte=maximum_annotations) | Q(total_annotations__gte=1, overlap=1)
+            # following definition of `completed_annotations` above, count cancelled annotations
+            # as completed if project is in IGNORE_SKIPPED mode
+            completed_annotations_f_expr = F('total_annotations')
+            if project.skip_queue == project.SkipQueue.IGNORE_SKIPPED:
+                completed_annotations_f_expr += F('cancelled_annotations')
+            finished_q = Q(GreaterThanOrEqual(completed_annotations_f_expr, maximum_annotations)) | Q(
+                GreaterThanOrEqual(completed_annotations_f_expr, 1), overlap=1
             )
+            finished_tasks = tasks.filter(finished_q)
             finished_tasks_ids = finished_tasks.values_list('id', flat=True)
             tasks.update(is_labeled=Q(id__in=finished_tasks_ids))
 

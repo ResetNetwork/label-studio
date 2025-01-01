@@ -984,6 +984,11 @@ ul {
   padding-left: 1.5rem;
 }
 
+.content-markdown div.admonition ol,
+.content-markdown div.admonition ul {
+  padding-left: 3.0rem;
+}
+
 /*
 .content-markdown ol li ul li {
   margin-top: 0;
@@ -1223,6 +1228,10 @@ ul {
   margin-top: 1em;
 }
 
+.toc-list-level-2~.toc-list-level-3 {
+  padding-left: 1em;
+}
+
 .toc-list-child {
   list-style: none;
   padding-left: 0.825em;
@@ -1251,7 +1260,7 @@ ul {
 
 .toc-enterprise-cta {
   margin-top: 2em;
-  padding: 1.5em 2em;
+  padding: 1.5em 1em;
   color: var(--color-gray-900);
   background: url("/images/design/gradient.svg");
   background-size: cover;

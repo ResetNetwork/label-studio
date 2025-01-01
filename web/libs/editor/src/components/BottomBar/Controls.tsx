@@ -5,14 +5,13 @@
  */
 
 import { observer } from "mobx-react";
-import type { Instance } from "mobx-state-tree";
 import type React from "react";
 import { useCallback, useState } from "react";
 
 import { IconBan, LsChevron } from "../../assets/icons";
 import { Button } from "../../common/Button/Button";
 import { Dropdown } from "../../common/Dropdown/Dropdown";
-import type { CustomButton } from "../../stores/CustomButton";
+import type { CustomButtonType } from "../../stores/CustomButton";
 import { Block, cn, Elem } from "../../utils/bem";
 import { FF_REVIEWER_FLOW, isFF } from "../../utils/feature-flags";
 import { isDefined, toArray } from "../../utils/utilities";
@@ -27,7 +26,6 @@ import {
 
 import "./Controls.scss";
 
-type CustomButtonType = Instance<typeof CustomButton>;
 // these buttons can be reused inside custom buttons or can be replaces with custom buttons
 type SupportedInternalButtons = "accept" | "reject";
 // special places for custom buttons — before, after or instead of internal buttons
@@ -108,6 +106,8 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
       ],
     );
 
+    if (annotation.isNonEditableDraft) return null;
+
     const buttonsBefore = customButtons.get("_before");
     const buttonsReplacement = customButtons.get("_replace");
     const firstToRender = buttonsReplacement ?? buttonsBefore;
@@ -122,7 +122,7 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
           if (customButton === "accept") {
             // just an example of internal button usage
             // @todo move buttons to separate components
-            buttons.push(<AcceptButton disabled={disabled} history={history} store={store} />);
+            buttons.push(<AcceptButton key={customButton} disabled={disabled} history={history} store={store} />);
           }
         } else {
           buttons.push(
@@ -130,7 +130,7 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
               key={customButton.name}
               disabled={disabled}
               button={customButton}
-              onClick={() => store.handleCustomButton?.(customButton.name)}
+              onClick={() => store.handleCustomButton?.(customButton)}
             />,
           );
         }
@@ -149,9 +149,7 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
         : [originalRejectButton];
 
       rejectButtons.forEach((button) => {
-        const action = hasCustomReject
-          ? () => store.handleCustomButton?.(button.name)
-          : () => store.rejectAnnotation({});
+        const action = hasCustomReject ? () => store.handleCustomButton?.(button) : () => store.rejectAnnotation({});
 
         const onReject = async (e: React.MouseEvent) => {
           const selected = store.annotationStore?.selected;
@@ -165,23 +163,23 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
           }
         };
 
-        buttons.push(<ControlButton button={button} disabled={disabled} onClick={onReject} />);
+        buttons.push(<ControlButton key={button.name} button={button} disabled={disabled} onClick={onReject} />);
       });
-      buttons.push(<AcceptButton disabled={disabled} history={history} store={store} />);
+      buttons.push(<AcceptButton key="review-accept" disabled={disabled} history={history} store={store} />);
     } else if (annotation.skipped) {
       buttons.push(
         <Elem name="skipped-info" key="skipped">
           <IconBan color="#d00" /> Was skipped
         </Elem>,
       );
-      buttons.push(<UnskipButton disabled={disabled} store={store} />);
+      buttons.push(<UnskipButton key="unskip" disabled={disabled} store={store} />);
     } else {
       if (store.hasInterface("skip")) {
         const onSkipWithComment = (e: React.MouseEvent, action: () => any) => {
           handleActionWithComments(e, action, "Please enter a comment before skipping");
         };
 
-        buttons.push(<SkipButton disabled={disabled} store={store} onSkipWithComment={onSkipWithComment} />);
+        buttons.push(<SkipButton key="skip" disabled={disabled} store={store} onSkipWithComment={onSkipWithComment} />);
       }
 
       const isDisabled = disabled || submitDisabled;

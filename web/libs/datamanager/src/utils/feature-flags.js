@@ -21,9 +21,6 @@ export const FF_DEV_2715 = "ff_front_dev_2715_audio_3_280722_short";
 // Comments for annotation editor
 export const FF_DEV_2887 = "fflag-feat-dev-2887-comments-ui-editor-short";
 
-// toggles the ability to drag columns on the datamanager table
-export const FF_DEV_2984 = "fflag_feat_front_dev_2984_dm_draggable_columns_short";
-
 export const FF_DEV_3034 = "fflag-feat-dev-3034-comments-with-drafts-short";
 
 export const FF_DEV_3873 = "fflag_feat_front_dev_3873_labeling_ui_improvements_short";
@@ -70,6 +67,11 @@ export const FF_LOPS_86 = "fflag_feat_front_lops_86_datasets_storage_edit_short"
  * @link https://app.launchdarkly.com/default/test/features/fflag_feat_front_leap_482_self_serve_short/
  */
 export const FF_SELF_SERVE = "fflag_feat_front_leap_482_self_serve_short";
+
+/** Add ability to preview image tasks in Data Manager Grid View */
+export const FF_GRID_PREVIEW = "fflag_feat_front_leap_1424_grid_preview_short";
+
+export const FF_MEMORY_LEAK_FIX = "fflag_feat_all_optic_1178_reduce_memory_leak_short";
 
 // Customize flags
 const flags = {};

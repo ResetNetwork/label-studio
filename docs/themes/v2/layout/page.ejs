@@ -1,11 +1,10 @@
 <% const isEnterpriseTheme = theme.tier === "enterprise" %>
-<% const pageContainsHeadings = page.content.includes("<h2") %>
 <% const tocPageTypes = page.type === "guide" || page.type === "blog" || page.type === "templates" || page.type === "tags" %>
-
-<% const showToc = pageContainsHeadings && tocPageTypes %>
 
 <% const formattedContent = removeContent(page.content) %>
 <% const tocContent = replaceContent(formattedContent) %>
+<% const pageHasHeading = /<h[1-6]\b[^>]*>/i.test(formattedContent); %>
+<% const showToc = tocPageTypes && pageHasHeading %>
 
 <div class="content-grid">
   <div class="content-markdown">
@@ -21,12 +20,17 @@
     <% if (showToc) { %>
       <div class="toc">
         <%- partial("component/text", {text: "In this article", tag: "h3", size: "Eyebrow"}) %>
-        <%- toc(tocContent, {max_depth: 3, list_number: false, class: "toc-list"}) %>
+        <%- tableOfContent(tocContent, {max_depth: 3}) %>
       </div>
     <% } %>
     <div class="toc-enterprise-cta">
-      <span class="toc-enterprise-cta-copy">Unlock more with Enterprise</span>
-      <%- partial("component/button", { url: "https://humansignal.com/contact-sales", label: "Get a Demo", theme: "Tertiary" }) %>
+      <% if(isEnterpriseTheme) { %>
+        <span class="toc-enterprise-cta-copy">Designed for teams of all sizes</span>
+        <%- partial("component/button", { url: "https://humansignal.com/contact-sales", label: "Contact Sales", theme: "Tertiary" }) %>
+      <% } else { %>
+        <span class="toc-enterprise-cta-copy">Designed for teams of all sizes</span>
+        <%- partial("component/button", { url: "https://humansignal.com/pricing", label: "Compare Versions", theme: "Tertiary" }) %>
+      <% } %>
     </div>
   </div>
 </div>

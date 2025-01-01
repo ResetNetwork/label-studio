@@ -98,9 +98,6 @@ export const FF_DEV_3793 = "fflag_fix_front_dev_3793_relative_coords_short";
  */
 export const FF_DEV_4075 = "fflag_fix_front_dev_4075_taxonomy_overlap_281222_short";
 
-// Enable a Magic Wand to be used for quickly thresholding images with segmentation labels.
-export const FF_DEV_4081 = "fflag_feat_front_dev_4081_magic_wand_tool";
-
 /**
  * Label stream ablation experiment for solving overlap issue
  * @link https://app.launchdarkly.com/default/production/features/fflag_fix_back_dev_4174_overlap_issue_experiments_10012023_short
@@ -274,6 +271,11 @@ export const FF_MULTI_OBJECT_HOTKEYS = "fflag_fix_leap_246_multi_object_hotkeys_
 export const FF_REVIEWER_FLOW = "fflag_feat_all_leap_1081_reviewer_flow_updates";
 
 export const FF_CUSTOM_SCRIPT = "fflag_feat_all_leap_883_custom_script_270524_short";
+
+/**
+ * It adds functionality of bulk annotation
+ */
+export const FF_BULK_ANNOTATION = "fflag_feat_all_leap_1181_bulk_annotation_short";
 
 /**
  * Disable the postpone option if the skip interface isn't set

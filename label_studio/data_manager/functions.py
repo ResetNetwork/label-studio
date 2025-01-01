@@ -90,18 +90,17 @@ def get_all_columns(project, *_):
         }
     ]
 
-    if flag_set('ff_back_2070_inner_id_12052022_short', user=project.organization.created_by):
-        result['columns'] += [
-            {
-                'id': 'inner_id',
-                'title': 'Inner ID',
-                'type': 'Number',
-                'help': 'Internal task ID starting from 1 for the current project',
-                'target': 'tasks',
-                'visibility_defaults': {'explore': False, 'labeling': False},
-                'project_defined': False,
-            }
-        ]
+    result['columns'] += [
+        {
+            'id': 'inner_id',
+            'title': 'Inner ID',
+            'type': 'Number',
+            'help': 'Internal task ID starting from 1 for the current project',
+            'target': 'tasks',
+            'visibility_defaults': {'explore': False, 'labeling': False},
+            'project_defined': False,
+        }
+    ]
 
     if flag_set('fflag_fix_back_lsdv_4648_annotator_filter_29052023_short', user=project.organization.created_by):
         project_members = project.all_members.values_list('id', flat=True)
@@ -357,7 +356,7 @@ def preprocess_filter(_filter, *_):
     return _filter
 
 
-def preprocess_field_name(raw_field_name, only_undefined_field=False) -> Tuple[str, bool]:
+def preprocess_field_name(raw_field_name, project) -> Tuple[str, bool]:
     """Transform a field name (as specified in the datamanager views endpoint) to
     a django ORM field name. Also handle dotted accesses to task.data.
 
@@ -389,7 +388,25 @@ def preprocess_field_name(raw_field_name, only_undefined_field=False) -> Tuple[s
         field_name = field_name[1:]
 
     if field_name.startswith('data.'):
-        if only_undefined_field:
+        # process as $undefined$ only if real_name is from labeling config, not from task.data
+        real_name = field_name.replace('data.', '')
+        common_data_columns = project.summary.common_data_columns
+        real_name_suitable = (
+            # there is only one object tag in labeling config
+            # and requested filter name == value from object tag
+            len(project.data_types.keys()) == 1
+            and real_name in project.data_types.keys()
+            # file was uploaded before labeling config is set, `data.data` is system predefined name
+            or len(project.data_types.keys()) == 0
+            and real_name == 'data'
+        )
+        if (
+            real_name_suitable
+            # common data columns are not None
+            and common_data_columns
+            # $undefined$ is in common data columns, in all tasks
+            and settings.DATA_UNDEFINED_NAME in common_data_columns
+        ):
             field_name = f'data__{settings.DATA_UNDEFINED_NAME}'
         else:
             field_name = field_name.replace('data.', 'data__')

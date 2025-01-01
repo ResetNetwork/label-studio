@@ -4,6 +4,7 @@ import json
 import logging
 import re
 from collections import OrderedDict, defaultdict
+from typing import Tuple, Union
 from urllib.parse import urlencode
 
 import defusedxml.ElementTree as etree
@@ -56,7 +57,7 @@ def parse_config(config_string):
 def _fix_choices(config):
     """
     workaround for single choice
-    https://github.com/heartexlabs/label-studio/issues/1259
+    https://github.com/HumanSignal/label-studio/issues/1259
     """
     if 'Choices' in config:
         # for single Choices tag in View
@@ -76,22 +77,37 @@ def _fix_choices(config):
     return config
 
 
-def parse_config_to_json(config_string):
+def parse_config_to_xml(config_string: Union[str, None], raise_on_empty: bool = False) -> Union[OrderedDict, None]:
+    if config_string is None:
+        if raise_on_empty:
+            raise TypeError('config_string is None')
+        return None
+
+    xml = etree.fromstring(config_string, forbid_dtd=True)
+
+    # Remove comments
+    for comment in xml.findall('.//comment'):
+        comment.getparent().remove(comment)
+
+    return xml
+
+
+def parse_config_to_json(config_string: Union[str, None]) -> Tuple[Union[OrderedDict, None], Union[str, None]]:
     try:
-        xml = etree.fromstring(config_string, forbid_dtd=False)
+        xml = parse_config_to_xml(config_string, raise_on_empty=True)
     except TypeError:
         raise etree.ParseError('can only parse strings')
     if xml is None:
         raise etree.ParseError('xml is empty or incorrect')
     config = xmljson.badgerfish.data(xml)
     config = _fix_choices(config)
-    return config
+    return config, etree.tostring(xml, encoding='unicode')
 
 
-def validate_label_config(config_string):
+def validate_label_config(config_string: Union[str, None]) -> None:
     # xml and schema
     try:
-        config = parse_config_to_json(config_string)
+        config, cleaned_config_string = parse_config_to_json(config_string)
         jsonschema.validate(config, _LABEL_CONFIG_SCHEMA_DATA)
     except (etree.ParseError, ValueError) as exc:
         raise LabelStudioValidationErrorSentryIgnored(str(exc))
@@ -106,13 +122,13 @@ def validate_label_config(config_string):
         raise LabelStudioValidationErrorSentryIgnored(error_message)
 
     # unique names in config # FIXME: 'name =' (with spaces) won't work
-    all_names = re.findall(r'name="([^"]*)"', config_string)
+    all_names = re.findall(r'name="([^"]*)"', cleaned_config_string)
     if len(set(all_names)) != len(all_names):
         raise LabelStudioValidationErrorSentryIgnored('Label config contains non-unique names')
 
     # toName points to existent name
     names = set(all_names)
-    toNames = re.findall(r'toName="([^"]*)"', config_string)
+    toNames = re.findall(r'toName="([^"]*)"', cleaned_config_string)
     for toName_ in toNames:
         for toName in toName_.split(','):
             if toName not in names:
@@ -121,7 +137,7 @@ def validate_label_config(config_string):
 
 def extract_data_types(label_config):
     # load config
-    xml = etree.fromstring(label_config, forbid_dtd=False)
+    xml = parse_config_to_xml(label_config)
     if xml is None:
         raise etree.ParseError('Project config is empty or incorrect')
 
@@ -185,16 +201,11 @@ def get_all_object_tag_names(label_config):
 
 
 def config_line_stipped(c):
-    tree = etree.fromstring(c, forbid_dtd=False)
-    comments = tree.xpath('//comment()')
+    xml = parse_config_to_xml(c)
+    if xml is None:
+        return None
 
-    for c in comments:
-        p = c.getparent()
-        if p is not None:
-            p.remove(c)
-        c = etree.tostring(tree, method='html').decode('utf-8')
-
-    return c.replace('\n', '').replace('\r', '')
+    return etree.tostring(xml, encoding='unicode').replace('\n', '').replace('\r', '')
 
 
 def get_task_from_labeling_config(config):
@@ -243,23 +254,24 @@ def data_examples(mode):
 def generate_sample_task_without_check(label_config, mode='upload', secure_mode=False):
     """Generate sample task only"""
     # load config
-    xml = etree.fromstring(label_config, forbid_dtd=False)
+    xml = parse_config_to_xml(label_config)
     if xml is None:
         raise etree.ParseError('Project config is empty or incorrect')
 
     # make examples pretty
     examples = data_examples(mode=mode)
 
-    # iterate over xml tree and find values with '$'
+    # iterate over xml tree and find elements with 'value' or 'valueList' attributes
     task = {}
-    parent = xml.findall('.//*[@value]')  # take all tags with value attribute
+    # Include both 'value' and 'valueList' attributes in the search
+    parent = xml.findall('.//*[@value]') + xml.findall('.//*[@valueList]')
     for p in parent:
-
-        # Make sure it is a real object tag, extract data placeholder key
-        value = p.get('value')
+        # Extract data placeholder key
+        value = p.get('value') or p.get('valueList')
         if not value or not value.startswith('$'):
             continue
         value = value[1:]
+        is_value_list = 'valueList' in p.attrib  # Check if the attribute is 'valueList'
 
         # detect secured mode - objects served as URLs
         value_type = p.get('valueType') or p.get('valuetype')
@@ -267,8 +279,8 @@ def generate_sample_task_without_check(label_config, mode='upload', secure_mode=
 
         example_from_field_name = examples.get('$' + value)
         if example_from_field_name:
-            # try to get example by variable name
-            task[value] = example_from_field_name
+            # Get example by variable name
+            task[value] = [example_from_field_name] if is_value_list else example_from_field_name
 
         elif value == 'video' and p.tag == 'HyperText':
             task[value] = examples.get('$videoHack')
@@ -286,7 +298,6 @@ def generate_sample_task_without_check(label_config, mode='upload', secure_mode=
                 task[value] = []
                 for item in examples[p.tag]:
                     task[value].append({name_key: item['author'], text_key: item['text']})
-
         elif p.tag == 'TimeSeries':
             # TimeSeries special case - generate signals on-the-fly
             time_column = p.get('timeColumn')
@@ -323,10 +334,11 @@ def generate_sample_task_without_check(label_config, mode='upload', secure_mode=
             else:
                 task[value] = examples['Choices']
         else:
-            # patch for valueType="url"
+            # Patch for valueType="url"
             examples['Text'] = examples['TextUrl'] if only_urls else examples['TextRaw']
-            # not found by name, try get example by type
-            task[value] = examples.get(p.tag, 'Something')
+            # Not found by name, try to get example by type
+            example_value = examples.get(p.tag, 'Something')
+            task[value] = [example_value] if is_value_list else example_value
 
         # support for Repeater tag
         if '[' in value:

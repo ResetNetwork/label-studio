@@ -63,6 +63,50 @@ Select how you want to distribute tasks to annotators for labeling.
 
 </dd>
 
+<dt id="lock-tasks">Task Reservation</dt>
+
+<dd>
+
+Control how long tasks are reserved for annotators. 
+
+Task reservation ensures that the tasks an annotator starts working on are temporarily reserved by them, preventing other annotators from accessing the same tasks until the reservation expires. This helps manage task allocation and keeps project progress efficient. 
+
+!!! note
+
+    Task reservation takes the [**Annotations per task minimum**](#overlap) into consideration. For example, if your overlap is `2`, then two annotators can reserve a task simultaneously. 
+
+    When [**Distribute Labeling Tasks**](#distribute-tasks) is set to **Manual**, the Task Reservation setting is hidden because it does not apply. 
+
+A task reservation is put in place as soon as an annotator opens the task. The reservation remains until one of the following happens (whichever happens first):
+
+* The task reservation time expires. 
+* The annotator submits the task. 
+* The annotator skips the task, and the project **Skip Queue** setting is either **Requeue skipped tasks to others** or **Ignore skipped**.
+
+**Recommended reservation time** 
+
+By default, the task reservation time is 1440 minutes (1 day). This is the maximum time allowed for task reservations.
+
+When setting a reservation time, you should aim to allow a little above the max amount of time it should take to complete a task. 
+
+* **Notes about allowing too much time**
+
+    If you allow too much time for task reservation, you could risk some users becoming blocked. 
+
+    For example, say you have multiple annotators working on a project. Your minimum annotation overlap is set to `2`. 
+
+    If some of your annotators move through their labeling queue looking for the easiest tasks to complete, they could inadvertently leave a large number of tasks locked. Depending on the size of the project and how many annotators you have working, this could result in some annotators unable to continue their work until the task reservation time expires. 
+
+* **Notes about allowing too little time**
+
+    If you set the reservation time too low, you may find that you have many tasks that exceed your minimum overlap setting. 
+
+    For example, say you have multiple annotators working on a project. Your minimum annotation overlap is set to `2`. 
+    
+    Two annotators begin working on a task and it takes them both 15 minutes to complete, but your reservation time is 10 minutes. This means that after 10 minutes, another annotator can also begin working on that task - resulting in 3 annotations on the task rather than 2 (your minimum annotator overlap).
+
+</dd>
+
 <dt>Skip Queue</dt>
 
 <dd>
@@ -147,7 +191,7 @@ Configure additional settings for annotators.
 | ------------- | ------------ |
 | **Show Skip button**         | Use this to show or hide the **Skip** action for annotators. |
 | **Allow empty annotations** | This determines whether annotators can submit a task without making any annotations on it. If enabled, annotators can submit a task even if they haven't added any labels or regions, resulting in an empty annotation. |
-| **Show the Data Manager to annotators** | When disabled, annotators can only enter the label stream. When enabled, annotators can access the Data Manager, where they can select which tasks to complete from the Data Manager list. <br /><br />However, some information is still hidden from annotators and they can only view a subset of the Data Manager columns. For example, they cannot see columns such as Annotators, Agreement, Reviewers, and more. |
+| **Show the Data Manager to annotators** | When disabled, annotators can only enter the label stream. When enabled, annotators can access the Data Manager. The tasks that are available to them depend on the labeling distribution mode: <ul><li>Auto distribution: Annotators can only see tasks that they have already completed or have created a draft.</li><li>Manual distribution: Annotators can only see the tasks that they have been assigned.</li></ul>Note that some information is still hidden from annotators and they can only view a subset of the Data Manager columns. For example, they cannot see columns such as Annotators, Agreement, Reviewers, and more. |
 | **Reveal pre-annotations interactively** | When enabled, pre-annotation regions (such as bounding boxes or text spans) are not automatically displayed to the annotator. Instead, annotators can draw a selection rectangle to reveal pre-annotation regions within that area. This allows annotators to first review the image or text without being influenced by the model’s predictions. Pre-annotation regions must have the attribute `"hidden": true`. <br /><br />This feature is particularly useful when there are multiple low-confidence regions that you prefer not to display all at once to avoid clutter. |
 | **Annotators must leave a comment on skip** | When enabled, annotators are required to leave a comment when skipping a task. |
 
@@ -280,12 +324,12 @@ When a reviewer clicks **Reject**, the annotation is not reassigned back to the 
 Reviewers see the following options:
 
 * **Accept**
-* **Reject** -- When selected, the annotation is rejected and skipped. 
+* **Remove** -- When selected, the annotation is rejected and removed from the labeling queue. 
 * **Requeue** -- When selected, the annotation is rejected and then reassigned back to the annotator.  
 
 For example, a reviewer might decide to requeue an annotation that is nearly correct but just needs a slight change. However, an annotation with numerous errors may be easier to simply reject entirely and remove from the queue. 
 
-Note that when you click **Reject**, the annotation is also marked as cancelled/skipped. This is reflected in various metrics (for example, Data Manager columns and dashboards), and differentiates between the two rejection actions in the API with `was_cancelled: true`. 
+Note that when you click **Remove**, the annotation is also marked as cancelled/skipped. This is reflected in various metrics (for example, Data Manager columns and dashboards), and differentiates between the two rejection actions in the API with `was_cancelled: true`. 
 
 </td>
 </tr>

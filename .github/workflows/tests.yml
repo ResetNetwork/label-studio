@@ -82,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ '3.10' ]
+        python-version: [ '3.12' ]
     env:
       DJANGO_SETTINGS_MODULE: core.settings.label_studio
       DJANGO_DB: default
@@ -163,7 +163,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: ${{ github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login != 'dependabot[bot]' }}
-        uses: codecov/codecov-action@v4.6.0
+        uses: codecov/codecov-action@v5.1.2
         with:
           name: codecov-python-${{ matrix.python-version }}
           flags: pytests
@@ -179,7 +179,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - '3.9'
+          - '3.10'
 
     # required for poetry action
     # see https://github.com/marketplace/actions/install-poetry-action#running-on-windows

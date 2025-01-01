@@ -25,7 +25,6 @@ import {
   FF_DEV_1442,
   FF_DEV_3077,
   FF_DEV_3793,
-  FF_DEV_4081,
   FF_LSDV_4583_6,
   FF_LSDV_4711,
   FF_LSDV_4930,
@@ -451,7 +450,7 @@ const Crosshair = memo(
  * of the image to support Magic Wand tool
  */
 const CanvasOverlay = observer(({ item }) => {
-  return isFF(FF_DEV_4081) ? (
+  return (
     <canvas
       className={styles.overlay}
       ref={(ref) => {
@@ -459,7 +458,7 @@ const CanvasOverlay = observer(({ item }) => {
       }}
       style={item.imageTransform}
     />
-  ) : null;
+  );
 });
 
 export default observer(
@@ -926,11 +925,15 @@ export default observer(
       const [toolsReady, stageLoading] = isFF(FF_LSDV_4583_6) ? [true, false] : [item.hasTools, item.stageWidth <= 1];
 
       const imageIsLoaded = item.imageIsLoaded || !isFF(FF_LSDV_4583_6);
+      const isViewingAll = store.annotationStore.viewingAll;
 
       return (
         <ObjectTag item={item} className={wrapperClasses.join(" ")}>
           {paginationEnabled ? (
-            <div className={styles.pagination}>
+            <div
+              className={styles.pagination}
+              title={isViewingAll ? "Pagination is not supported in View All Annotations" : undefined}
+            >
               <Pagination
                 size="small"
                 outline={false}
@@ -944,6 +947,7 @@ export default observer(
                 totalPages={item.parsedValueList.length}
                 onChange={(n) => item.setCurrentImage(n - 1)}
                 pageSizeSelectable={false}
+                disabled={isViewingAll}
               />
             </div>
           ) : null}

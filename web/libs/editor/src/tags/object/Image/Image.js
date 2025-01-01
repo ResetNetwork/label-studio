@@ -18,7 +18,6 @@ import {
   FF_DEV_3377,
   FF_DEV_3666,
   FF_DEV_3793,
-  FF_DEV_4081,
   FF_LSDV_4583,
   FF_LSDV_4583_6,
   FF_LSDV_4711,
@@ -70,7 +69,7 @@ const IMAGE_PRELOAD_COUNT = 3;
  * @meta_description Customize Label Studio with the Image tag to annotate images for computer vision machine learning and data science projects.
  * @param {string} name                       - Name of the element
  * @param {string} value                      - Data field containing a path or URL to the image
- * @param {string} [valueList]                - References a variable that holds a list of image URLs
+ * @param {string} [valueList]                - References a variable that holds a list of image URLs. For an example, see the [Multi-Page Document Annotation](/templates/multi-page-document-annotation) template.
  * @param {boolean} [smoothing]               - Enable smoothing, by default it uses user settings
  * @param {string=} [width=100%]              - Image width
  * @param {string=} [maxWidth=750px]          - Maximum image width
@@ -292,9 +291,6 @@ const Model = types
 
       if (isFF(FF_LSDV_4711) && (!value || value === "none")) return "anonymous";
 
-      if (!isFF(FF_DEV_4081)) {
-        return null;
-      }
       if (!value || value === "none") {
         return null;
       }
