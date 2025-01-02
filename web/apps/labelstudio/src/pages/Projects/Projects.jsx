@@ -14,8 +14,6 @@ import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
 import { useAbortController, useUpdatePageTitle } from "@humansignal/core";
 import "./Projects.scss";
 import { OrgSwitcher } from "../../components/OrgSwitcher/OrgSwitcher";
-import { useAbortController, useUpdatePageTitle } from "@humansignal/core";
-import "./Projects.scss";
 
 const getCurrentPage = () => {
   const pageNumberFromURL = new URLSearchParams(location.search).get("page");
@@ -82,6 +80,7 @@ export const ProjectsPage = () => {
             "total_predictions_number",
             "ground_truth_number",
             "finished_task_number",
+            "weekly_annotation_count",
           ].join(","),
           page_size: pageSize,
         },

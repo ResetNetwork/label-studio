@@ -3,11 +3,12 @@ import { format } from "date-fns";
 import { useMemo } from "react";
 import { NavLink } from "react-router-dom";
 import { IconCheck, IconEllipsis, IconMinus, IconSparks } from "@humansignal/icons";
-import { Userpic, Button, Dropdown, Tooltip } from "@humansignal/ui";
+import { Button, Dropdown, Tooltip, Userpic } from "@humansignal/ui";
 import { Menu, Pagination } from "../../components";
+import { ProjectStateChip } from "@humansignal/app-common";
 import { cn } from "../../utils/bem";
 import { absoluteURL } from "../../utils/helpers";
-import { ProjectStateChip } from "@humansignal/app-common";
+import { getEmoji } from "./ProjectsUtils";
 
 const DEFAULT_CARD_COLORS = ["#FFFFFF", "#FDFDFC"];
 
@@ -55,13 +56,13 @@ export const EmptyProjectsList = ({ openModal }) => {
 const ProjectCard = ({ project }) => {
   const color = useMemo(() => {
     return DEFAULT_CARD_COLORS.includes(project.color) ? null : project.color;
-  }, [project]);
+  }, [project.color]);
 
   const projectColors = useMemo(() => {
     const textColor =
       color && chr(color).luminance() > 0.3
         ? "var(--color-neutral-inverted-content)"
-        : "var(--color-neutral-inverted-content)"; // Determine text color based on luminance
+        : "var(--color-neutral-inverted-content)";
     return color
       ? {
           "--header-color": color,
@@ -72,20 +73,19 @@ const ProjectCard = ({ project }) => {
       : {};
   }, [color]);
 
+  const progressPercentage =
+    project?.task_number > 0 ? Math.round((project.finished_task_number / project.task_number) * 100) : 0;
+
+  const emoji = getEmoji(project.weekly_annotation_count, project.task_number, project.finished_task_number);
+
   return (
-    <NavLink
-      className={cn("projects-page").elem("link").toClassName()}
-      to={`/projects/${project.id}/data`}
-      data-external
-    >
+    <NavLink className={cn("projects-page").elem("link").toClassName()} to={`/projects/${project.id}/data`} data-external>
       <div className={cn("project-card").mod({ colored: !!color }).toClassName()} style={projectColors}>
         <div className={cn("project-card").elem("header").toClassName()}>
           <div className={cn("project-card").elem("title").toClassName()}>
             <div className={cn("project-card").elem("title-text-wrapper").toClassName()}>
               <Tooltip title={project.title ?? "New project"}>
-                <div className={cn("project-card").elem("title-text").toClassName()}>
-                  {project.title ?? "New project"}
-                </div>
+                <div className={cn("project-card").elem("title-text").toClassName()}>{project.title ?? "New project"}</div>
               </Tooltip>
             </div>
 
@@ -116,6 +116,7 @@ const ProjectCard = ({ project }) => {
               </div>
             )}
           </div>
+
           <div className={cn("project-card").elem("summary").toClassName()}>
             <div className={cn("project-card").elem("annotation").toClassName()}>
               <div className={cn("project-card").elem("total").toClassName()}>
@@ -138,10 +139,25 @@ const ProjectCard = ({ project }) => {
             </div>
           </div>
         </div>
+
         <div className={cn("project-card").elem("description").toClassName()}>{project.description}</div>
+
+        <div className={cn("project-card").elem("footer").toClassName()}>
+          <div className={cn("project-card").elem("progress-bar").toClassName()}>
+            <div
+              className={cn("project-card").elem("progress-fill").mod({ complete: progressPercentage === 100 }).toClassName()}
+              style={{
+                width: `${progressPercentage}%`,
+                opacity: 0.4 + (progressPercentage / 100) * 0.6,
+              }}
+            />
+          </div>
+          <div className={cn("project-card").elem("emoji").toClassName()}>{emoji}</div>
+        </div>
+
         <div className={cn("project-card").elem("info").toClassName()}>
           <div className={cn("project-card").elem("created-date").toClassName()}>
-            {format(new Date(project.created_at), "dd MMM yyyy, HH:mm")}
+            {project.created_at ? format(new Date(project.created_at), "dd MMM yyyy, HH:mm") : ""}
           </div>
           <div className={cn("project-card").elem("created-by").toClassName()}>
             <Userpic src="#" user={project.created_by} showUsernameTooltip />
@@ -151,3 +167,4 @@ const ProjectCard = ({ project }) => {
     </NavLink>
   );
 };
+
