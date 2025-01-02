@@ -14,6 +14,7 @@ import { IconPlus } from "@humansignal/icons";
 import { useToast } from "@humansignal/ui";
 import { InviteLink } from "./InviteLink";
 import { SelectedUser } from "./SelectedUser";
+import { OrgSwitcher } from "../../../components/OrgSwitcher/OrgSwitcher";
 
 export const PeoplePage = () => {
   const apiSettingsModal = useRef();
@@ -61,7 +62,9 @@ export const PeoplePage = () => {
     <Block name="people">
       <Elem name="controls">
         <Space spread>
-          <Space />
+          <Space>
+            <OrgSwitcher />
+          </Space>
 
           <Space>
             {isFF(FF_AUTH_TOKENS) && (
