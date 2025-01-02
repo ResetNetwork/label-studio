@@ -25,6 +25,17 @@ class ProjectMemberInline(admin.TabularInline):
     raw_id_fields = ('user',)
     autocomplete_fields = ['user']
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "project":
+            if request._obj_ is not None:  # We have an instance
+                # Filter out projects that the user is already a member of
+                kwargs["queryset"] = Project.objects.exclude(
+                    members=request._obj_
+                )
+            else:
+                kwargs["queryset"] = Project.objects.all()
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 
 # Inline configuration for organization members
 class OrganizationMemberInline(admin.TabularInline):
@@ -153,6 +164,11 @@ class UserAdminShort(UserAdmin):
         extra_context = extra_context or {}
         extra_context['show_bulk_assign_button'] = True
         return super().changelist_view(request, extra_context=extra_context)
+
+    def get_form(self, request, obj=None, **kwargs):
+        # Store the object for use in ProjectMemberInline
+        request._obj_ = obj
+        return super().get_form(request, obj, **kwargs)
 
 
 class AsyncMigrationStatusAdmin(admin.ModelAdmin):
