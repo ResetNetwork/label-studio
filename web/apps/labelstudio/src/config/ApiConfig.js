@@ -73,6 +73,10 @@ export const API_CONFIG = {
     createWebhook: "POST:/webhooks",
     deleteWebhook: "DELETE:/webhooks/:pk",
     webhooksInfo: "/webhooks/info",
+
+    // Organizations
+    userOrganizations: "/me/organizations",
+    setActiveOrganization: "POST:/me/active-organization",
   },
   alwaysExpectJSON: false,
 };

@@ -2,6 +2,7 @@
 """
 from django.urls import include, path
 from organizations import api, views
+from organizations.api import ActiveOrganizationAPI
 
 app_name = 'organizations'
 
@@ -37,4 +38,5 @@ urlpatterns = [
     # invite
     path('api/invite', api.OrganizationInviteAPI.as_view(), name='organization-invite'),
     path('api/invite/reset-token', api.OrganizationResetTokenAPI.as_view(), name='organization-reset-token'),
+    path('api/active-organization/', ActiveOrganizationAPI.as_view(), name='active-organization'),
 ]

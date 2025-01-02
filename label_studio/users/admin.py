@@ -14,8 +14,7 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import path
 from django import forms
-
-
+from django.urls import path
 # Inline configuration for project members
 class ProjectMemberInline(admin.TabularInline):
     model = ProjectMember
@@ -112,7 +111,8 @@ class UserAdminShort(UserAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('bulk-assign/', self.admin_site.admin_view(self.bulk_assign_view), name='users_user_bulk-assign'),
+            path('bulk-assign/', self.admin_site.admin_view(self.bulk_assign_view), 
+                 name='users_user_bulk-assign'),
         ]
         return custom_urls + urls
 

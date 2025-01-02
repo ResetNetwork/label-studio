@@ -18,6 +18,8 @@ from rest_framework.views import APIView
 from users.functions import check_avatar
 from users.models import User
 from users.serializers import UserSerializer, UserSerializerUpdate
+from rest_framework import status
+from organizations.models import Organization
 
 logger = logging.getLogger(__name__)
 
@@ -296,3 +298,118 @@ class UserWhoAmIAPI(generics.RetrieveAPIView):
 
     def get(self, request, *args, **kwargs):
         return super(UserWhoAmIAPI, self).get(request, *args, **kwargs)
+
+
+@method_decorator(
+    name='get',
+    decorator=swagger_auto_schema(
+        tags=['Organizations'],
+        x_fern_sdk_group_name='organizations',
+        x_fern_sdk_method_name='list_available',
+        operation_summary='List available organizations',
+        operation_description='Get list of organizations available for the current user',
+        responses={
+            200: openapi.Response(
+                description='List of organizations',
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'organizations': openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    'id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'title': openapi.Schema(type=openapi.TYPE_STRING),
+                                    'active': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                                }
+                            )
+                        )
+                    }
+                )
+            )
+        }
+    )
+)
+class UserOrganizationsAPI(APIView):
+    """List organizations available for the current user"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        organizations = user.organizations.all()
+        active_org = user.active_organization
+        
+        return Response({
+            'organizations': [{
+                'id': org.id,
+                'title': org.title,
+                'active': org.id == active_org.id if active_org else False
+            } for org in organizations]
+        })
+
+
+@method_decorator(
+    name='post',
+    decorator=swagger_auto_schema(
+        tags=['Organizations'],
+        x_fern_sdk_group_name='organizations',
+        x_fern_sdk_method_name='set_active',
+        operation_summary='Set active organization',
+        operation_description='Set the active organization for the current user',
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['organization_id'],
+            properties={
+                'organization_id': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description='ID of the organization to set as active'
+                )
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description='Organization set as active successfully',
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN)
+                    }
+                )
+            ),
+            404: openapi.Response(
+                description='Organization not found',
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'error': openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            )
+        }
+    )
+)
+class ActiveOrganizationAPI(APIView):
+    """Set active organization for the current user"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        user = request.user
+        org_id = request.data.get('organization_id')
+        
+        if org_id is None:
+            return Response(
+                {'error': 'organization_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            organization = user.organizations.get(id=org_id)
+            user.active_organization = organization
+            user.save(update_fields=['active_organization'])
+            return Response({'success': True})
+        except Organization.DoesNotExist:
+            return Response(
+                {'error': 'Organization not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )

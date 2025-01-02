@@ -14,6 +14,7 @@ import { DataManagerPage } from "../DataManager/DataManager";
 import { SettingsPage } from "../Settings";
 import "./Projects.scss";
 import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
+import { OrgSwitcher } from "../../components/OrgSwitcher/OrgSwitcher";
 
 const getCurrentPage = () => {
   const pageNumberFromURL = new URLSearchParams(location.search).get("page");
@@ -125,6 +126,9 @@ export const ProjectsPage = () => {
           <Spinner size={64} />
         </Elem>
         <Elem name="content" case="loaded">
+          <Elem name="header">
+            <OrgSwitcher />
+          </Elem>
           {projectsList.length ? (
             <ProjectsList
               projects={projectsList}
