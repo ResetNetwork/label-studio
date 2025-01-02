@@ -30,7 +30,7 @@ class ProjectMemberInline(admin.TabularInline):
             if request._obj_ is not None:  # We have an instance
                 # Filter out projects where the user is already a member
                 kwargs["queryset"] = Project.objects.exclude(
-                    projectmember__user=request._obj_
+                    members=request._obj_
                 )
             else:
                 kwargs["queryset"] = Project.objects.all()
