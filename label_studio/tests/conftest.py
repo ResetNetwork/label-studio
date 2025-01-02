@@ -74,7 +74,7 @@ def debug_modal_exceptions_false(settings):
 def enable_sentry():
     settings.SENTRY_RATE = 0
     # it's disabled key, but this is correct
-    settings.SENTRY_DSN = 'https://44f7a50de5ab425ca6bc406ef69b2122@o227124.ingest.sentry.io/5820521'
+    settings.SENTRY_DSN = ''
 
 
 @pytest.fixture(scope='function')

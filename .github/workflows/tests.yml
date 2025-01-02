@@ -36,7 +36,7 @@ jobs:
       SENTRY_RATE: 0
       DJANGO_DB: sqlite
       JSON_LOG: 0
-      # SENTRY_DSN:
+      SENTRY_DSN:""
 
     steps:
       - uses: hmarr/debug-action@v3.0.0

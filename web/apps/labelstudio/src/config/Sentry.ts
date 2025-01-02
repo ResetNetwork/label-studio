@@ -7,7 +7,7 @@ export const initSentry = (history: RouterHistory) => {
   if (APP_SETTINGS.debug === false) {
     setTags();
     Sentry.init({
-      dsn: "https://5f51920ff82a4675a495870244869c6b@o227124.ingest.sentry.io/5838868",
+      dsn: "",
       integrations: [
         Sentry.browserTracingIntegration(),
         ReactSentry.reactRouterV5BrowserTracingIntegration({ history }),

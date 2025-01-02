@@ -627,7 +627,7 @@ FEATURE_FLAGS_OFFLINE = get_bool_env('FEATURE_FLAGS_OFFLINE', True)
 FEATURE_FLAGS_DEFAULT_VALUE = False
 
 # Whether to send analytics telemetry data. Fall back to old lowercase name for legacy compatibility.
-COLLECT_ANALYTICS = get_bool_env('COLLECT_ANALYTICS', get_bool_env('collect_analytics', True))
+COLLECT_ANALYTICS = get_bool_env('COLLECT_ANALYTICS', get_bool_env('collect_analytics', False))
 
 # Strip harmful content from SVG files by default
 SVG_SECURITY_CLEANUP = get_bool_env('SVG_SECURITY_CLEANUP', False)
@@ -725,26 +725,26 @@ if ENABLE_CSP := get_bool_env('ENABLE_CSP', True):
         "'unsafe-inline'",
         "'unsafe-eval'",
         'blob:',
-        'browser.sentry-cdn.com',
-        'https://*.googletagmanager.com',
+        # 'browser.sentry-cdn.com',
+        # 'https://*.googletagmanager.com',
     )
     CSP_IMG_SRC = (
         "'self'",
         "'report-sample'",
         'data:',
-        'https://*.google-analytics.com',
-        'https://*.googletagmanager.com',
+        # 'https://*.google-analytics.com',
+        # 'https://*.googletagmanager.com',
         'https://*.google.com',
     )
     CSP_CONNECT_SRC = (
         "'self'",
         "'report-sample'",
-        'https://*.google-analytics.com',
-        'https://*.analytics.google.com',
-        'https://analytics.google.com',
-        'https://*.googletagmanager.com',
-        'https://*.g.double' + 'click.net',  # hacky way of suppressing codespell complaint
-        'https://*.ingest.sentry.io',
+        # 'https://*.google-analytics.com',
+        # 'https://*.analytics.google.com',
+        # 'https://analytics.google.com',
+        # 'https://*.googletagmanager.com',
+        # 'https://*.g.double' + 'click.net',  # hacky way of suppressing codespell complaint
+        # 'https://*.ingest.sentry.io',
     )
     # Note that this will be overridden to real CSP for views that use the override_report_only_csp decorator
     CSP_REPORT_ONLY = get_bool_env('LS_CSP_REPORT_ONLY', True)
