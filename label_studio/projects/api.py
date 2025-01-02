@@ -30,7 +30,7 @@ from ml.serializers import MLBackendSerializer
 from projects.functions.next_task import get_next_task
 from projects.functions.stream_history import get_label_stream_history
 from projects.functions.utils import recalculate_created_annotations_and_labels_from_scratch
-from projects.models import Project, ProjectImport, ProjectManager, ProjectReimport, ProjectSummary
+from projects.models import Project, ProjectImport, ProjectManager, ProjectReimport, ProjectSummary, ProjectMember
 from projects.serializers import (
     GetFieldsSerializer,
     ProjectCountsSerializer,
@@ -180,7 +180,10 @@ class ProjectListAPI(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
         filter = serializer.validated_data.get('filter')
-        projects = Project.objects.filter(organization=self.request.user.active_organization).order_by(
+        projects = Project.objects.filter(
+            organization=self.request.user.active_organization,
+            members__user=self.request.user
+        ).order_by(
             F('pinned_at').desc(nulls_last=True), '-created_at'
         )
         if filter in ['pinned_only', 'exclude_pinned']:
@@ -202,7 +205,12 @@ class ProjectListAPI(generics.ListCreateAPIView):
 
     def perform_create(self, ser):
         try:
-            ser.save(organization=self.request.user.active_organization)
+            project = ser.save(organization=self.request.user.active_organization)
+            # Add creator as a project member
+            ProjectMember.objects.create(
+                user=self.request.user,
+                project=project
+            )
         except IntegrityError as e:
             if str(e) == 'UNIQUE constraint failed: project.title, project.created_by_id':
                 raise ProjectExistException(
@@ -382,7 +390,7 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
         projects = Project.objects.with_counts(fields=fields).filter(
-            organization=self.request.user.active_organization
+            organization=self.request.user.active_organization, members__user=self.request.user
         )
 
         # Only annotate FSM state for UI/API consumption when both feature flags are enabled
