@@ -6,6 +6,7 @@ import { LsBulb, LsCheck, LsEllipsis, LsMinus } from "../../assets/icons";
 import { Button, Dropdown, Menu, Pagination, Userpic } from "../../components";
 import { Block, Elem } from "../../utils/bem";
 import { absoluteURL } from "../../utils/helpers";
+import { getEmoji } from './ProjectsUtils';
 
 const DEFAULT_CARD_COLORS = ["#FFFFFF", "#FDFDFC"];
 
@@ -62,12 +63,25 @@ const ProjectCard = ({ project }) => {
       : {};
   }, [color]);
 
+  // Calculate progress percentage from real data
+  const progressPercentage = project.task_number > 0 
+    ? Math.round((project.finished_task_number / project.task_number) * 100)
+    : 0;
+
+  const emoji = getEmoji(
+    project.weekly_annotation_count,
+    project.task_number,
+    project.finished_task_number
+  );
+
   return (
     <Elem tag={NavLink} name="link" to={`/projects/${project.id}/data`} data-external>
       <Block name="project-card" mod={{ colored: !!color }} style={projectColors}>
         <Elem name="header">
           <Elem name="title">
-            <Elem name="title-text">{project.title ?? "New project"}</Elem>
+            <Elem name="title-text">
+              {project.title ?? "New project"}
+            </Elem>
 
             <Elem
               name="menu"
@@ -88,6 +102,7 @@ const ProjectCard = ({ project }) => {
               </Dropdown.Trigger>
             </Elem>
           </Elem>
+
           <Elem name="summary">
             <Elem name="annotation">
               <Elem name="total">
@@ -110,13 +125,20 @@ const ProjectCard = ({ project }) => {
             </Elem>
           </Elem>
         </Elem>
-        <Elem name="description">{project.description}</Elem>
-        <Elem name="info">
-          <Elem name="created-date">{format(new Date(project.created_at), "dd MMM ’yy, HH:mm")}</Elem>
-          <Elem name="created-by">
-            <Userpic src="#" user={project.created_by} showUsername />
+        <Elem name="footer">
+          <Elem name="progress-bar">
+            <Elem 
+              name="progress-fill" 
+              mod={{ complete: progressPercentage === 100 }}
+              style={{ 
+                width: `${progressPercentage}%`,
+                opacity: 0.4 + (progressPercentage / 100) * 0.6,
+              }}
+            />
           </Elem>
+          <Elem name="emoji">{emoji}</Elem>
         </Elem>
+        <Elem name="description">{project.description}</Elem>
       </Block>
     </Elem>
   );

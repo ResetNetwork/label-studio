@@ -67,6 +67,7 @@ class ProjectSerializer(FlexFieldsModelSerializer):
         default=None, read_only=True, help_text='Flag to detect is project ready for labeling'
     )
     finished_task_number = serializers.IntegerField(default=None, read_only=True, help_text='Finished tasks')
+    weekly_annotation_count = serializers.IntegerField(default=None, read_only=True, help_text='Weekly annotation count')
 
     queue_total = serializers.SerializerMethodField()
     queue_done = serializers.SerializerMethodField()
@@ -156,6 +157,7 @@ class ProjectSerializer(FlexFieldsModelSerializer):
             'finished_task_number',
             'queue_total',
             'queue_done',
+            'weekly_annotation_count',
         ]
 
     def validate_label_config(self, value):

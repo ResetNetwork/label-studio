@@ -15,6 +15,7 @@ import { SettingsPage } from "../Settings";
 import "./Projects.scss";
 import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
 import { OrgSwitcher } from "../../components/OrgSwitcher/OrgSwitcher";
+import { getEmoji } from './ProjectsUtils';
 
 const getCurrentPage = () => {
   const pageNumberFromURL = new URLSearchParams(location.search).get("page");
@@ -51,6 +52,9 @@ export const ProjectsPage = () => {
         "color",
         "is_published",
         "assignment_settings",
+        "weekly_annotation_count",
+        "task_number",
+        "finished_task_number",
       ].join(",");
     }
 
@@ -82,6 +86,7 @@ export const ProjectsPage = () => {
             "total_predictions_number",
             "ground_truth_number",
             "finished_task_number",
+            "weekly_annotation_count",
           ].join(","),
           page_size: pageSize,
         },

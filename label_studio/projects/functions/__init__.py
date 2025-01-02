@@ -2,6 +2,8 @@ from core.feature_flags import flag_set
 from core.utils.db import SQCount
 from django.db.models import Count, OuterRef, Q
 from tasks.models import Annotation, Prediction, Task
+from django.utils import timezone
+from datetime import timedelta
 
 
 def annotate_task_number(queryset):
@@ -58,3 +60,14 @@ def annotate_ground_truth_number(queryset):
 def annotate_skipped_annotations_number(queryset):
     subquery = Annotation.objects.filter(Q(project=OuterRef('pk')) & Q(was_cancelled=True)).values('id')
     return queryset.annotate(skipped_annotations_number=SQCount(subquery))
+
+
+def annotate_weekly_annotation_count(queryset):
+    """Returns number of annotations created in the last 7 days"""
+    one_week_ago = timezone.now() - timedelta(days=7)
+    annotations = Annotation.objects.filter(
+        Q(project=OuterRef('id')) & 
+        Q(created_at__gte=one_week_ago) &
+        Q(was_cancelled=False)
+    ).values('id')
+    return queryset.annotate(weekly_annotation_count=SQCount(annotations))
