@@ -28,9 +28,9 @@ class ProjectMemberInline(admin.TabularInline):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "project":
             if request._obj_ is not None:  # We have an instance
-                # Filter out projects that the user is already a member of
+                # Filter out projects where the user is already a member
                 kwargs["queryset"] = Project.objects.exclude(
-                    members=request._obj_
+                    projectmember__user=request._obj_
                 )
             else:
                 kwargs["queryset"] = Project.objects.all()
