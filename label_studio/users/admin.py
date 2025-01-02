@@ -28,13 +28,20 @@ class ProjectMemberInline(admin.TabularInline):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "project":
             if request._obj_ is not None:  # We have an instance
-                # Filter out projects where the user is already a member
-                kwargs["queryset"] = Project.objects.exclude(
-                    members=request._obj_
-                )
+                # Get base queryset of all projects
+                base_queryset = Project.objects.all()
+                
+                # Include all projects for existing memberships
+                kwargs["queryset"] = base_queryset
             else:
                 kwargs["queryset"] = Project.objects.all()
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def get_formset(self, request, obj=None, **kwargs):
+        # Store the current project when rendering existing memberships
+        formset = super().get_formset(request, obj, **kwargs)
+        formset.form.base_fields['project'].widget.can_add_related = False
+        return formset
 
 
 # Inline configuration for organization members
