@@ -25,8 +25,7 @@ export const initSentry = (history: RouterHistory) => {
     setTags();
 
     Sentry.init({
-      dsn: APP_SETTINGS.sentry_dsn,
-      tracePropagationTargets,
+      dsn: "",
       integrations: [
         Sentry.browserTracingIntegration(),
         ReactSentry.reactRouterV5BrowserTracingIntegration({ history }),
