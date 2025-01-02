@@ -15,6 +15,7 @@ import "./PeopleInvitation.scss";
 import { PeopleList } from "./PeopleList";
 import "./PeoplePage.scss";
 import { SelectedUser } from "./SelectedUser";
+import { OrgSwitcher } from "../../../components/OrgSwitcher/OrgSwitcher";
 
 const InvitationModal = ({ link }) => {
   return (
@@ -130,7 +131,9 @@ export const PeoplePage = () => {
     <Block name="people">
       <Elem name="controls">
         <Space spread>
-          <Space />
+          <Space>
+            <OrgSwitcher />
+          </Space>
 
           <Space>
             <Button icon={<LsPlus />} primary onClick={showInvitationModal}>

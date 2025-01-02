@@ -16,6 +16,7 @@ import "./Projects.scss";
 import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
 import { OrgSwitcher } from "../../components/OrgSwitcher/OrgSwitcher";
 import { getEmoji } from './ProjectsUtils';
+import { Space } from "../../components/Space/Space";
 
 const getCurrentPage = () => {
   const pageNumberFromURL = new URLSearchParams(location.search).get("page");
@@ -132,7 +133,11 @@ export const ProjectsPage = () => {
         </Elem>
         <Elem name="content" case="loaded">
           <Elem name="header">
-            <OrgSwitcher />
+            <div style={{ padding: '0 40px' }}>
+              <Space>
+                <OrgSwitcher />
+              </Space>
+            </div>
           </Elem>
           {projectsList.length ? (
             <ProjectsList
