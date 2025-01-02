@@ -95,6 +95,9 @@ export const API_CONFIG = {
 
     // FSM
     fsmStateHistory: "GET:/fsm/entities/:entityType/:entityId/history",
+    // Organizations
+    userOrganizations: "/me/organizations",
+    setActiveOrganization: "POST:/me/active-organization",
   },
   alwaysExpectJSON: false,
 };

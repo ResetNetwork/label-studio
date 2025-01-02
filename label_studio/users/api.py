@@ -15,9 +15,11 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import status
 from users.functions import check_avatar
 from users.models import User
 from users.serializers import HotkeysSerializer, UserSerializer, UserSerializerUpdate, WhoAmIUserSerializer
+from organizations.models import Organization
 
 logger = logging.getLogger(__name__)
 
@@ -420,3 +422,98 @@ class UserHotkeysAPI(APIView):
         except Exception as e:
             logger.error(f'Error updating hotkeys for user {request.user.pk}: {str(e)}')
             return Response({'error': 'Failed to update hotkeys configuration'}, status=500)
+
+
+@extend_schema(
+    tags=['Organizations'],
+    summary='List available organizations',
+    description='Get list of organizations available for the current user.',
+    responses={
+        200: OpenApiResponse(
+            description='List of organizations',
+            response={
+                'type': 'object',
+                'properties': {
+                    'organizations': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'id': {'type': 'integer'},
+                                'title': {'type': 'string'},
+                                'active': {'type': 'boolean'},
+                            },
+                        },
+                    }
+                },
+            },
+        )
+    },
+    extensions={
+        'x-fern-sdk-group-name': 'organizations',
+        'x-fern-sdk-method-name': 'list_available',
+        'x-fern-audiences': ['public'],
+    },
+)
+class UserOrganizationsAPI(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        organizations = Organization.objects.filter(
+            organizationmember__user=request.user, organizationmember__deleted_at__isnull=True
+        ).distinct()
+        active_org_id = getattr(request.user.active_organization, 'id', None)
+        return Response(
+            {
+                'organizations': [
+                    {'id': org.id, 'title': org.title, 'active': org.id == active_org_id} for org in organizations
+                ]
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+@extend_schema(
+    tags=['Organizations'],
+    summary='Set active organization',
+    description='Set the active organization for the current user.',
+    request={
+        'application/json': {
+            'type': 'object',
+            'required': ['organization_id'],
+            'properties': {'organization_id': {'type': 'integer'}},
+        }
+    },
+    responses={
+        200: OpenApiResponse(description='Active organization updated successfully'),
+        400: OpenApiResponse(description='Bad request'),
+        404: OpenApiResponse(description='Organization not found'),
+    },
+    extensions={
+        'x-fern-sdk-group-name': 'organizations',
+        'x-fern-sdk-method-name': 'set_active',
+        'x-fern-audiences': ['public'],
+    },
+)
+class ActiveOrganizationAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = (JSONParser,)
+
+    def post(self, request, *args, **kwargs):
+        org_id = request.data.get('organization_id')
+        if org_id is None:
+            return Response({'error': 'organization_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        organization = (
+            Organization.objects.filter(
+                id=org_id, organizationmember__user=request.user, organizationmember__deleted_at__isnull=True
+            )
+            .distinct()
+            .first()
+        )
+        if organization is None:
+            return Response({'error': 'Organization not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        request.user.active_organization = organization
+        request.user.save(update_fields=['active_organization'])
+        return Response({'success': True}, status=status.HTTP_200_OK)

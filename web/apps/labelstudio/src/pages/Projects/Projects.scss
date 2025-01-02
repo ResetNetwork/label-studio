@@ -53,6 +53,17 @@
       grid-template-columns: repeat(4, 1fr);
     }
   }
+  @media (width >= 1460px) {
+    &__list {
+      grid-template-columns: repeat(5, 1fr);
+    }
+  }
+
+  &__header {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--sand_100);
+    margin-bottom: 16px;
+  }
 }
 
 .empty-projects-page {
