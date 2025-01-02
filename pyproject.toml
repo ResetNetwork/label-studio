@@ -204,6 +204,7 @@ setuptools = ">=75.4.0"
 
 # Humansignal repo dependencies
 label-studio-sdk = "1.0.8"
+python-dotenv = "^1.0.1"
 
 [tool.poetry.group.test.dependencies]
 pytest = "7.2.2"
