@@ -26,6 +26,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from label_studio_sdk.label_interface.interface import LabelInterface
 from ml.serializers import MLBackendSerializer
+from projects.functions import annotate_finished_task_number, annotate_weekly_annotation_count
 from projects.functions.next_task import get_next_task
 from projects.functions.stream_history import get_label_stream_history
 from projects.functions.utils import recalculate_created_annotations_and_labels_from_scratch
@@ -179,12 +180,17 @@ class ProjectListAPI(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
         filter = serializer.validated_data.get('filter')
-        projects = Project.objects.filter(organization=self.request.user.active_organization).order_by(
+        queryset = Project.objects.filter(
+            organization=self.request.user.active_organization,
+            members__user=self.request.user
+        ).order_by(
             F('pinned_at').desc(nulls_last=True), '-created_at'
         )
         if filter in ['pinned_only', 'exclude_pinned']:
-            projects = projects.filter(pinned_at__isnull=filter == 'exclude_pinned')
-        return ProjectManager.with_counts_annotate(projects, fields=fields).prefetch_related('members', 'created_by')
+            queryset = queryset.filter(pinned_at__isnull=filter == 'exclude_pinned')
+        queryset = annotate_finished_task_number(queryset)
+        queryset = annotate_weekly_annotation_count(queryset)
+        return ProjectManager.with_counts_annotate(queryset, fields=fields).prefetch_related('members', 'created_by')
 
     def get_serializer_context(self):
         context = super(ProjectListAPI, self).get_serializer_context()

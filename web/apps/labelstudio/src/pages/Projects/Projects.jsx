@@ -7,12 +7,14 @@ import { Spinner } from "../../components/Spinner/Spinner";
 import { ApiContext } from "../../providers/ApiProvider";
 import { useContextProps } from "../../providers/RoutesProvider";
 import { Block, Elem } from "../../utils/bem";
+import { FF_DEV_2575, isFF } from "../../utils/feature-flags";
 import { CreateProject } from "../CreateProject/CreateProject";
 import { DataManagerPage } from "../DataManager/DataManager";
 import { SettingsPage } from "../Settings";
 import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
 import { OrgSwitcher } from "../../components/OrgSwitcher/OrgSwitcher";
 import { useAbortController, useUpdatePageTitle } from "@humansignal/core";
+import { getEmoji } from './ProjectsUtils';
 import "./Projects.scss";
 
 const getCurrentPage = () => {
@@ -45,15 +47,30 @@ export const ProjectsPage = () => {
 
     const requestParams = { page, page_size: pageSize };
 
-    requestParams.include = [
-      "id",
-      "title",
-      "created_by",
-      "created_at",
-      "color",
-      "is_published",
-      "assignment_settings",
-    ].join(",");
+    if (isFF(FF_DEV_2575)) {
+      requestParams.include = [
+        "id",
+        "title",
+        "created_by",
+        "created_at",
+        "color",
+        "is_published",
+        "assignment_settings",
+        "weekly_annotation_count",
+        "task_number",
+        "finished_task_number",
+      ].join(",");
+    } else {
+      requestParams.include = [
+        "id",
+        "title",
+        "created_by",
+        "created_at",
+        "color",
+        "is_published",
+        "assignment_settings",
+      ].join(",");
+    }
 
     const data = await api.callApi("projects", {
       params: requestParams,
@@ -79,6 +96,7 @@ export const ProjectsPage = () => {
             "total_predictions_number",
             "ground_truth_number",
             "finished_task_number",
+            "weekly_annotation_count",
           ].join(","),
           page_size: pageSize,
         },

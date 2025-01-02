@@ -38,5 +38,5 @@ urlpatterns = [
     # invite
     path('api/invite', api.OrganizationInviteAPI.as_view(), name='organization-invite'),
     path('api/invite/reset-token', api.OrganizationResetTokenAPI.as_view(), name='organization-reset-token'),
-    path('api/active-organization/', ActiveOrganizationAPI.as_view(), name='active-organization'),
+    path('api/me/active-organization', ActiveOrganizationAPI.as_view(), name='active-organization'),
 ]
