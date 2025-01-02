@@ -9,6 +9,7 @@ from django.views.static import serve
 from rest_framework import routers
 from users import api, views
 from users.product_tours import api as product_tours_api
+from users.api import UserOrganizationsAPI, ActiveOrganizationAPI
 
 router = routers.DefaultRouter()
 router.register(r'users', api.UserAPI, basename='user')
@@ -28,6 +29,9 @@ urlpatterns = [
     # Product tours
     path('api/current-user/product-tour', product_tours_api.ProductTourAPI.as_view(), name='product-tour'),
     path('api/current-user/hotkeys/', api.UserHotkeysAPI.as_view(), name='current-user-hotkeys'),
+    # Organization switching
+    path('api/me/organizations/', UserOrganizationsAPI.as_view(), name='user-organizations'),
+    path('api/me/active-organization/', ActiveOrganizationAPI.as_view(), name='user-active-organization'),
 ]
 
 # When CLOUD_FILE_STORAGE_ENABLED is set, avatars are uploaded to cloud storage with a different URL pattern.

@@ -92,6 +92,10 @@ export const API_CONFIG = {
 
     accessTokenSettings: "GET:/jwt/settings",
     accessTokenUpdateSettings: "POST:/jwt/settings",
+
+    // Organizations
+    userOrganizations: "/me/organizations",
+    setActiveOrganization: "POST:/me/active-organization",
   },
   alwaysExpectJSON: false,
 };

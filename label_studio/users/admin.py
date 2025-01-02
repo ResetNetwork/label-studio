@@ -6,9 +6,62 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import Group
 from ml.models import MLBackend, MLBackendTrainJob
 from organizations.models import Organization, OrganizationMember
-from projects.models import Project
+from projects.models import Project, ProjectMember
 from tasks.models import Annotation, Prediction, Task
 from users.models import User
+from django.contrib import messages
+from django.shortcuts import redirect, render
+from django.urls import path
+from django import forms
+
+
+# Inline configuration for project members
+class ProjectMemberInline(admin.TabularInline):
+    model = ProjectMember
+    extra = 1
+    verbose_name = 'Project Member'
+    verbose_name_plural = 'Project Members'
+    raw_id_fields = ('user',)
+    autocomplete_fields = ['user']
+
+
+# Inline configuration for organization members
+class OrganizationMemberInline(admin.TabularInline):
+    model = OrganizationMember
+    extra = 1
+
+
+class UserProjectInline(admin.TabularInline):
+    model = ProjectMember
+    extra = 1
+    verbose_name = 'Project Membership'
+    verbose_name_plural = 'Project Memberships'
+    raw_id_fields = ('project',)
+    autocomplete_fields = ['project']
+
+
+# Add new form for bulk user-project assignment
+class BulkProjectAssignForm(forms.Form):
+    users = forms.ModelMultipleChoiceField(
+        queryset=User.objects.all(),
+        widget=forms.SelectMultiple(attrs={'size': '10'})
+    )
+    projects = forms.ModelMultipleChoiceField(
+        queryset=Project.objects.all(),
+        widget=forms.SelectMultiple(attrs={'size': '10'})
+    )
+
+
+# Add new form for bulk organization-project assignment
+class BulkOrganizationProjectAssignForm(forms.Form):
+    organizations = forms.ModelMultipleChoiceField(
+        queryset=Organization.objects.all(),
+        widget=forms.SelectMultiple(attrs={'size': '10'})
+    )
+    projects = forms.ModelMultipleChoiceField(
+        queryset=Project.objects.all(),
+        widget=forms.SelectMultiple(attrs={'size': '10'})
+    )
 
 
 class UserAdminShort(UserAdmin):
@@ -53,6 +106,53 @@ class UserAdminShort(UserAdmin):
             ('Important dates', {'fields': ('last_login', 'date_joined')}),
         )
 
+        self.inlines = [ProjectMemberInline]
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('bulk-assign/', self.admin_site.admin_view(self.bulk_assign_view),
+                 name='users_user_bulk-assign'),
+        ]
+        return custom_urls + urls
+
+    def bulk_assign_view(self, request):
+        if request.method == 'POST':
+            form = BulkProjectAssignForm(request.POST)
+            if form.is_valid():
+                users = form.cleaned_data['users']
+                projects = form.cleaned_data['projects']
+
+                # Create ProjectMember entries for each user-project combination
+                created_count = 0
+                for user in users:
+                    for project in projects:
+                        _, created = ProjectMember.objects.get_or_create(
+                            user=user,
+                            project=project,
+                            defaults={'enabled': True}
+                        )
+                        if created:
+                            created_count += 1
+
+                messages.success(request, f'Successfully created {created_count} project memberships')
+                return redirect('..')
+        else:
+            form = BulkProjectAssignForm()
+
+        # Add the form to the context and render the template
+        context = {
+            'title': 'Bulk Assign Users to Projects',
+            'form': form,
+            'opts': self.model._meta,
+            **self.admin_site.each_context(request),
+        }
+        return render(request, 'admin/users/bulk_assign_form.html', context)
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['show_bulk_assign_button'] = True
+        return super().changelist_view(request, extra_context=extra_context)
 
 class AsyncMigrationStatusAdmin(admin.ModelAdmin):
     def __init__(self, *args, **kwargs):

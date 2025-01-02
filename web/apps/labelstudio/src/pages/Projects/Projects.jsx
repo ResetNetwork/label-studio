@@ -11,6 +11,7 @@ import { CreateProject } from "../CreateProject/CreateProject";
 import { DataManagerPage } from "../DataManager/DataManager";
 import { SettingsPage } from "../Settings";
 import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
+import { OrgSwitcher } from "../../components/OrgSwitcher/OrgSwitcher";
 import { useAbortController, useUpdatePageTitle } from "@humansignal/core";
 import "./Projects.scss";
 
@@ -122,6 +123,9 @@ export const ProjectsPage = () => {
           <Spinner size={64} />
         </Elem>
         <Elem name="content" case="loaded">
+          <Elem name="header">
+            <OrgSwitcher />
+          </Elem>
           {projectsList.length ? (
             <ProjectsList
               projects={projectsList}
