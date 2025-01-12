@@ -16,6 +16,7 @@ import { OrgSwitcher } from "../../components/OrgSwitcher/OrgSwitcher";
 import { useAbortController, useUpdatePageTitle } from "@humansignal/core";
 import { getEmoji } from './ProjectsUtils';
 import { Space } from "../../components/Space/Space";
+import { UserStatsCard } from "../../components/UserStatsCard/UserStatsCard";
 import "./Projects.scss";
 
 const getCurrentPage = () => {
@@ -144,11 +145,17 @@ export const ProjectsPage = () => {
         <Elem name="content" case="loaded">
           <Elem name="header">
             <div style={{ padding: '0 40px' }}>
-              <Space>
-                <OrgSwitcher />
+              <Space spread>
+                <Space>
+                  <OrgSwitcher />
+                </Space>
+                <Space>
+                  <UserStatsCard />
+                </Space>
               </Space>
             </div>
           </Elem>
+
           {projectsList.length ? (
             <ProjectsList
               projects={projectsList}

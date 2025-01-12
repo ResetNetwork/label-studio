@@ -1,0 +1,189 @@
+import React, { useEffect, useState } from 'react';
+import { Spin } from 'antd';
+import { useAPI } from '../../providers/ApiProvider';
+import { formatDuration } from '../../utils/format';
+import { Block, Elem } from '../../utils/bem';
+import { Tooltip } from '../../components/Tooltip/Tooltip';
+import './UserStatsCard.scss';
+
+const getMetricEmoji = (key, value) => {
+  switch (key) {
+    case 'annotations_today':
+      if (value === 0) return '😴';
+      if (value < 10) return '🌱';
+      if (value < 30) return '⭐';
+      if (value < 50) return '🔥';
+      return '🚀';
+    case 'annotations_week':
+      if (value === 0) return '💤';
+      if (value < 10) return '🌱';
+      if (value < 50) return '🌿';
+      if (value < 100) return '✨';
+      if (value < 200) return '💫';
+      return '🌟';
+    case 'annotations_quarter':
+      if (value === 0) return '🌑';
+      if (value < 250) return '🌒';
+      if (value < 500) return '🌓';
+      if (value < 1000) return '🌔';
+      return '🌕';
+    case 'avg_annotation_time':
+      // Lower is better for annotation time
+      if (value < 30) return '⚡';
+      if (value < 60) return '🏃';
+      if (value < 120) return '👣';
+      if (value < 240) return '🐢';
+      return '🎯';
+    case 'regularity':
+      if (value === 0) return '🌪️';
+      if (value < 30) return '🌧️';
+      if (value < 60) return '⛅';
+      if (value < 90) return '🌤️';
+      return '☀️';
+    case 'projects_contributed':
+      if (value === 0) return '🌱';
+      if (value === 1) return '🎯';
+      if (value < 3) return '🎨';
+      if (value < 5) return '🎪';
+      return '🎭';
+    case 'total_time_week':
+      if (value === 0) return '⏰';
+      if (value < 2) return '⌚';
+      if (value < 5) return '⏱️';
+      if (value < 10) return '🕰️';
+      return '⚡';
+    default:
+      return '';
+  }
+};
+
+const MetricItem = ({ label, value, tooltip, metricKey }) => (
+  <Elem name="metric" role="listitem">
+    <Tooltip title={tooltip}>
+      <Elem name="metric-content">
+        <Elem name="value" aria-label={`${value} ${label}`}>
+          {value} {getMetricEmoji(metricKey, typeof value === 'string' ? parseFloat(value) : value)}
+        </Elem>
+        <Elem name="label">{label}</Elem>
+      </Elem>
+    </Tooltip>
+  </Elem>
+);
+
+export const UserStatsCard = () => {
+  const { callApi } = useAPI();
+  const [metrics, setMetrics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const fetchMetrics = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await callApi('userMetrics');
+      setMetrics(response);
+    } catch (err) {
+      setError(err.message || 'Failed to load metrics');
+      if (retryCount < 3) {
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          fetchMetrics();
+        }, Math.pow(2, retryCount) * 1000);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMetrics();
+  }, []);
+
+  const formatMetricValue = (key, value) => {
+    switch (key) {
+      case 'avg_annotation_time':
+        return formatDuration(value);
+      case 'regularity':
+        return `${value}%`;
+      case 'total_time_week':
+        return `${value}h`;
+      default:
+        return value.toLocaleString();
+    }
+  };
+
+  const getMetricTooltip = (key) => {
+    const tooltips = {
+      annotations_today: 'Number of annotations you created today',
+      annotations_week: 'Number of annotations you created in the last 7 days',
+      annotations_quarter: 'Number of annotations you created in the last 90 days',
+      avg_annotation_time: 'Average time spent per annotation (excluding top/bottom 10%)',
+      regularity: 'Percentage of the last 10 days where you created 3 or more annotations',
+      projects_contributed: 'Number of different projects you have contributed to',
+      total_time_week: 'Total time spent annotating this week'
+    };
+    return tooltips[key] || '';
+  };
+
+  const getMetricLabel = (key) => {
+    const labels = {
+      annotations_today: 'Today',
+      annotations_week: 'This Week',
+      annotations_quarter: 'This Quarter',
+      avg_annotation_time: 'Avg Time',
+      regularity: 'Regularity',
+      projects_contributed: 'Projects',
+      total_time_week: 'Hours This Week'
+    };
+    return labels[key] || key;
+  };
+
+  if (error) {
+    return (
+      <Block name="user-stats" mod={{ error: true }}>
+        <Elem name="error">
+          <Elem name="error-title">Error loading metrics</Elem>
+          <Elem name="error-message">{error}</Elem>
+          <Elem 
+            tag="button" 
+            name="error-action" 
+            onClick={fetchMetrics}
+            role="button" 
+            tabIndex={0}
+          >
+            Retry
+          </Elem>
+        </Elem>
+      </Block>
+    );
+  }
+
+  return (
+    <Block name="user-stats" mod={{ loading }}>
+      <Elem name="header">
+        <Elem name="title">Annotation Stats</Elem>
+      </Elem>
+
+      {loading ? (
+        <Elem name="loading" role="status" aria-label="Loading metrics">
+          <Spin size="large" />
+        </Elem>
+      ) : (
+        <Elem name="content" role="list">
+          {metrics && Object.entries(metrics).map(([key, value]) => (
+            <MetricItem
+              key={key}
+              label={getMetricLabel(key)}
+              value={formatMetricValue(key, value)}
+              tooltip={getMetricTooltip(key)}
+              metricKey={key}
+            />
+          ))}
+        </Elem>
+      )}
+    </Block>
+  );
+};
+
+export default UserStatsCard; 

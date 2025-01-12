@@ -9,6 +9,7 @@ export const API_CONFIG = {
     me: "/current-user/whoami",
     hotkeys: "GET:/current-user/hotkeys/",
     updateHotkeys: "PATCH:/current-user/hotkeys/",
+    userMetrics: "/projects/user-metrics",
 
     // Organization
     memberships: "/organizations/:pk/memberships",
