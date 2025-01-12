@@ -42,10 +42,10 @@ const getMetricEmoji = (key, value) => {
       return '☀️';
     case 'projects_contributed':
       if (value === 0) return '🌱';
-      if (value === 1) return '🎯';
+      if (value === 1) return '🌿';
       if (value < 3) return '🎨';
       if (value < 5) return '🎪';
-      return '🎭';
+      return '🎯';
     case 'total_time_week':
       if (value === 0) return '⏰';
       if (value < 2) return '⌚';
@@ -118,10 +118,10 @@ export const UserStatsCard = () => {
       annotations_today: 'Number of annotations you created today',
       annotations_week: 'Number of annotations you created in the last 7 days',
       annotations_quarter: 'Number of annotations you created in the last 90 days',
+      total_time_week: 'Total time spent annotating this week',
       avg_annotation_time: 'Average time spent per annotation (excluding top/bottom 10%)',
       regularity: 'Percentage of the last 10 days where you created 3 or more annotations',
       projects_contributed: 'Number of different projects you have contributed to',
-      total_time_week: 'Total time spent annotating this week'
     };
     return tooltips[key] || '';
   };
@@ -131,10 +131,10 @@ export const UserStatsCard = () => {
       annotations_today: 'Today',
       annotations_week: 'This Week',
       annotations_quarter: 'This Quarter',
+      total_time_week: 'Hours This Week',
       avg_annotation_time: 'Avg Time',
       regularity: 'Regularity',
       projects_contributed: 'Projects',
-      total_time_week: 'Hours This Week'
     };
     return labels[key] || key;
   };
