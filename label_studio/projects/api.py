@@ -1033,10 +1033,10 @@ class UserMetricsAPI(generics.RetrieveAPIView):
                 'annotations_today': counts['today'],
                 'annotations_week': counts['week'],
                 'annotations_quarter': counts['quarter'],
+                'total_time_week': total_hours,
                 'avg_annotation_time': avg_time,
                 'regularity': int((days_with_annotations / 10) * 100),
                 'projects_contributed': counts['projects_contributed'],
-                'total_time_week': total_hours
             }
 
             # Cache the results
