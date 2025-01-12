@@ -4,6 +4,7 @@ export const API_CONFIG = {
     // Users
     users: "/users",
     me: "/current-user/whoami",
+    userMetrics: "/projects/user-metrics",
 
     // Organization
     memberships: "/organizations/:pk/memberships",

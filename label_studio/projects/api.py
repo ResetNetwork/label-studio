@@ -3,6 +3,7 @@
 import logging
 import os
 import pathlib
+from datetime import datetime, timedelta
 
 import drf_yasg.openapi as openapi
 from core.filters import ListFilter
@@ -42,11 +43,11 @@ from rest_framework.exceptions import NotFound
 from rest_framework.exceptions import ValidationError as RestValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.views import exception_handler
-from tasks.models import Task
+from tasks.models import Task, Annotation
 from tasks.serializers import (
     NextTaskSerializer,
     TaskSerializer,
@@ -55,6 +56,15 @@ from tasks.serializers import (
 )
 from webhooks.models import WebhookAction
 from webhooks.utils import api_webhook, api_webhook_for_delete, emit_webhooks_for_instance
+from django.utils import timezone
+from django.contrib.auth.models import User
+from django.db.models import Count, Q, F, ExpressionWrapper, DurationField, Avg, Sum
+from django.db.models.functions import TruncDate
+from rest_framework.exceptions import APIException
+from core.utils.common import timeit
+from core.redis import redis_connected, start_job_async_or_sync
+from django.core.cache import cache
+from typing import Dict, Union, List
 
 from label_studio.core.utils.common import load_func
 
@@ -848,3 +858,245 @@ class ProjectModelVersions(generics.RetrieveAPIView):
         count = project.delete_predictions(model_version=model_version)
 
         return Response(data=count)
+
+
+@swagger_auto_schema(
+    tags=['Users'],
+    operation_summary='Get user metrics',
+    operation_description='''
+    Get metrics about the current user's annotation activity.
+    
+    Returns:
+    - annotations_today: Number of annotations created today
+    - annotations_week: Number of annotations created in the last 7 days
+    - annotations_quarter: Number of annotations created in the last 90 days
+    - avg_annotation_time: Average time per annotation in seconds (excluding top/bottom 10%)
+    - regularity: Percentage of last 10 days with 3+ annotations
+    - projects_contributed: Number of different projects contributed to
+    - total_time_week: Total time spent annotating this week in hours
+    ''',
+    responses={
+        200: openapi.Response(
+            description='User metrics',
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'annotations_today': openapi.Schema(
+                        type=openapi.TYPE_INTEGER,
+                        description='Number of annotations created today'
+                    ),
+                    'annotations_week': openapi.Schema(
+                        type=openapi.TYPE_INTEGER,
+                        description='Number of annotations created in the last 7 days'
+                    ),
+                    'annotations_quarter': openapi.Schema(
+                        type=openapi.TYPE_INTEGER,
+                        description='Number of annotations created in the last 90 days'
+                    ),
+                    'avg_annotation_time': openapi.Schema(
+                        type=openapi.TYPE_NUMBER,
+                        description='Average time per annotation in seconds (excluding top/bottom 10%)'
+                    ),
+                    'regularity': openapi.Schema(
+                        type=openapi.TYPE_INTEGER,
+                        description='Percentage of last 10 days with 3+ annotations'
+                    ),
+                    'projects_contributed': openapi.Schema(
+                        type=openapi.TYPE_INTEGER,
+                        description='Number of different projects contributed to'
+                    ),
+                    'total_time_week': openapi.Schema(
+                        type=openapi.TYPE_NUMBER,
+                        description='Total time spent annotating this week in hours'
+                    )
+                }
+            )
+        ),
+        400: openapi.Response(
+            description='Bad request',
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'detail': openapi.Schema(
+                        type=openapi.TYPE_STRING,
+                        description='Error message'
+                    )
+                }
+            )
+        ),
+        500: openapi.Response(
+            description='Internal server error',
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'detail': openapi.Schema(
+                        type=openapi.TYPE_STRING,
+                        description='Error message'
+                    )
+                }
+            )
+        )
+    }
+)
+class UserMetricsAPI(generics.RetrieveAPIView):
+    """API endpoint for retrieving user annotation metrics.
+    
+    This endpoint provides various statistics about a user's annotation activity,
+    including daily, weekly, and quarterly counts, average annotation time, and
+    a regularity score.
+    
+    The metrics are cached for 5 minutes to improve performance.
+    """
+    permission_required = ViewClassPermission(GET=all_permissions.tasks_view)
+    parser_classes = (JSONParser,)
+    queryset = Annotation.objects.all()
+    CACHE_TTL = 300  # 5 minutes
+
+    def _get_cache_key(self, user_id: int, org_id: int) -> str:
+        """Generate a cache key for user metrics"""
+        return f'user_metrics:{user_id}:{org_id}'
+
+    def get_queryset(self):
+        """Get base queryset for annotations"""
+        return Annotation.objects.filter(
+            was_cancelled=False,
+            project__organization=self.request.user.active_organization
+        )
+
+    def _calculate_metrics(self, user_id: int, org_id: int) -> Dict[str, Union[int, float]]:
+        """Calculate user metrics with optimized database queries
+        
+        Args:
+            user_id: The ID of the user
+            org_id: The ID of the user's active organization
+            
+        Returns:
+            Dict containing the calculated metrics
+            
+        Raises:
+            APIException: If there's an error calculating the metrics
+        """
+        try:
+            now = timezone.now()
+            start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            week_ago = now - timedelta(days=7)
+
+            # Base queryset with organization scope
+            annotations = self.get_queryset().filter(completed_by_id=user_id)
+
+            # Get all counts in one query
+            counts = annotations.aggregate(
+                today=Count('id', filter=Q(created_at__gte=start_of_today)),
+                week=Count('id', filter=Q(created_at__gte=week_ago)),
+                quarter=Count('id', filter=Q(created_at__gte=now - timedelta(days=90))),
+                projects_contributed=Count('project_id', distinct=True),
+                total_time_week=ExpressionWrapper(
+                    Sum(
+                        F('updated_at') - F('created_at'),
+                        filter=Q(
+                            created_at__gte=week_ago,
+                            updated_at__isnull=False
+                        )
+                    ),
+                    output_field=DurationField()
+                )
+            )
+
+            # Calculate average time using database
+            durations = annotations.filter(
+                created_at__gte=now - timedelta(days=90),
+                updated_at__isnull=False
+            ).annotate(
+                duration=ExpressionWrapper(
+                    F('updated_at') - F('created_at'),
+                    output_field=DurationField()
+                )
+            ).values_list('duration', flat=True)
+
+            avg_time = self._calculate_trimmed_mean(durations)
+
+            # Calculate regularity using database
+            days_with_annotations = annotations.filter(
+                created_at__gte=now - timedelta(days=10)
+            ).annotate(
+                date=TruncDate('created_at')
+            ).values('date').annotate(
+                count=Count('id')
+            ).filter(count__gte=3).count()
+
+            # Convert total_time_week from timedelta to hours
+            total_hours = 0
+            if counts['total_time_week']:
+                total_hours = round(counts['total_time_week'].total_seconds() / 3600, 1)
+
+            metrics = {
+                'annotations_today': counts['today'],
+                'annotations_week': counts['week'],
+                'annotations_quarter': counts['quarter'],
+                'avg_annotation_time': avg_time,
+                'regularity': int((days_with_annotations / 10) * 100),
+                'projects_contributed': counts['projects_contributed'],
+                'total_time_week': total_hours
+            }
+
+            # Cache the results
+            cache_key = self._get_cache_key(user_id, org_id)
+            cache.set(cache_key, metrics, self.CACHE_TTL)
+
+            return metrics
+
+        except Exception as e:
+            logger.error(f"Error calculating metrics for user {user_id}: {str(e)}", exc_info=True)
+            raise APIException("Failed to calculate metrics")
+
+    def _calculate_trimmed_mean(self, durations: List[timedelta]) -> float:
+        """Calculate trimmed mean of durations, excluding top/bottom 10%
+        
+        Args:
+            durations: List of timedelta objects
+            
+        Returns:
+            float: The trimmed mean in seconds, or 0 if no valid durations
+        """
+        if not durations:
+            return 0
+        
+        # Convert to seconds and filter invalid
+        seconds = sorted(
+            d.total_seconds() for d in durations 
+            if d and d.total_seconds() > 0
+        )
+        
+        if not seconds:
+            return 0
+
+        # Remove top/bottom 10%
+        cutoff = int(len(seconds) * 0.1)
+        if cutoff > 0:
+            trimmed = seconds[cutoff:-cutoff]
+        else:
+            trimmed = seconds
+
+        return round(sum(trimmed) / len(trimmed), 1) if trimmed else 0
+
+    def get_object(self):
+        """Get user metrics, using cache if available"""
+        user = self.request.user
+        cache_key = self._get_cache_key(user.id, user.active_organization_id)
+        
+        # Try to get from cache first
+        metrics = cache.get(cache_key)
+        if metrics is not None:
+            return metrics
+
+        # Calculate if not in cache
+        return self._calculate_metrics(user.id, user.active_organization_id)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Override retrieve to add performance monitoring"""
+        try:
+            metrics = self.get_object()
+            return Response(metrics)
+        except Exception as e:
+            logger.error(f"Error retrieving metrics: {str(e)}", exc_info=True)
+            raise APIException("Failed to retrieve metrics")

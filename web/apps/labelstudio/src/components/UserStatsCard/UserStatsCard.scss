@@ -1,0 +1,138 @@
+@import '../../themes/default/variables';
+@import '../../themes/default/colors';
+
+.user-stats {
+  --user-stats-gap: 8px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  min-width: 600px;
+  transition: box-shadow 0.1s ease;
+
+  &_loading {
+    pointer-events: none;
+  }
+
+  &_error {
+    background: var(--red-light);
+    border: 1px solid var(--red-dark);
+  }
+
+  &__header {
+    padding: 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  &__title {
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 22px;
+    color: #1f1f1f;
+  }
+
+  &__content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--user-stats-gap);
+    padding: var(--user-stats-gap);
+  }
+
+  &__loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80px;
+  }
+
+  &__error {
+    padding: 16px;
+    color: var(--red-dark);
+
+    &-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    &-message {
+      margin-bottom: 16px;
+    }
+
+    &-action {
+      appearance: none;
+      border: none;
+      background: none;
+      padding: 0;
+      color: var(--blue);
+      cursor: pointer;
+      text-decoration: underline;
+
+      &:hover {
+        color: var(--blue-hover);
+      }
+    }
+  }
+
+  &__metric {
+    flex: 1;
+    min-width: 100px;
+    text-align: center;
+    padding: var(--user-stats-gap);
+    border-radius: 4px;
+    background: var(--blue-light);
+    transition: transform 0.1s ease;
+    cursor: default;
+
+    &:hover {
+      transform: translateY(-1px);
+    }
+  }
+
+  &__metric-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  &__value {
+    font-weight: bold;
+    font-size: 18px;
+    line-height: 30px;
+    color: var(--blue);
+  }
+
+  &__label {
+    font-size: 14px;
+    line-height: 16px;
+    color: #666;
+    margin-top: 4px;
+  }
+}
+
+[data-theme='dark'] {
+  .user-stats {
+    background: var(--dm-1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+
+    &__title {
+      color: #fff;
+    }
+
+    &__metric {
+      background: var(--dm-3);
+      border: 1px solid var(--dm-4);
+
+      &:hover {
+        border-color: var(--blue);
+      }
+    }
+
+    &__value {
+      color: var(--blue-hover);
+    }
+
+    &__label {
+      color: #999;
+    }
+  }
+} 
