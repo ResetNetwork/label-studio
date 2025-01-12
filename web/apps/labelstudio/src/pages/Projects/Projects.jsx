@@ -14,6 +14,7 @@ import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
 import { useAbortController, useUpdatePageTitle } from "@humansignal/core";
 import "./Projects.scss";
 import { OrgSwitcher } from "../../components/OrgSwitcher/OrgSwitcher";
+import { UserStatsCard } from "../../components/UserStatsCard/UserStatsCard";
 
 const getCurrentPage = () => {
   const pageNumberFromURL = new URLSearchParams(location.search).get("page");
@@ -127,6 +128,7 @@ export const ProjectsPage = () => {
         <div className={cn("projects-page").elem("content").toClassName()} case="loaded">
           <div className={cn("projects-page").elem("header").toClassName()}>
             <OrgSwitcher />
+            <UserStatsCard />
           </div>
           {projectsList.length ? (
             <ProjectsList
