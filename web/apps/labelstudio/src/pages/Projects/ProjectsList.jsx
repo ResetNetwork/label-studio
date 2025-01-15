@@ -11,10 +11,17 @@ import { getEmoji } from './ProjectsUtils';
 const DEFAULT_CARD_COLORS = ["#FFFFFF", "#FDFDFC"];
 
 export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, pageSize }) => {
+  // Sort projects by completion percentage
+  const sortedProjects = [...projects].sort((a, b) => {
+    const completionA = a.task_number > 0 ? (a.finished_task_number / a.task_number) : 0;
+    const completionB = b.task_number > 0 ? (b.finished_task_number / b.task_number) : 0;
+    return completionA - completionB; // Sort ascending (least complete first)
+  });
+
   return (
     <>
       <Elem name="list">
-        {projects.map((project) => (
+        {sortedProjects.map((project) => (
           <ProjectCard key={project.id} project={project} />
         ))}
       </Elem>
