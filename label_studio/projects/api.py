@@ -64,8 +64,8 @@ from users.serializers import UserSimpleSerializer
 from webhooks.models import WebhookAction
 from webhooks.utils import api_webhook, api_webhook_for_delete, emit_webhooks_for_instance
 from django.utils import timezone
-from django.db.models import Count, Q, F, ExpressionWrapper, DurationField, Avg, Sum
-from django.db.models.functions import TruncDate
+from django.db.models import Count, Q, F, ExpressionWrapper, DurationField, Avg, Sum, Case, When, FloatField, Value
+from django.db.models.functions import TruncDate, Cast
 from rest_framework.exceptions import APIException
 from core.utils.common import timeit
 from core.redis import redis_connected
@@ -191,17 +191,39 @@ class ProjectListAPI(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
         filter = serializer.validated_data.get('filter')
+        
+        # Base queryset with annotations
         queryset = Project.objects.filter(
             organization=self.request.user.active_organization,
             members__user=self.request.user
-        ).order_by(
-            F('pinned_at').desc(nulls_last=True), '-created_at'
         )
-        if filter in ['pinned_only', 'exclude_pinned']:
-            queryset = queryset.filter(pinned_at__isnull=filter == 'exclude_pinned')
+        
+        # First annotate with counts
+        queryset = ProjectManager.with_counts_annotate(queryset, fields=fields)
         queryset = annotate_finished_task_number(queryset)
         queryset = annotate_weekly_annotation_count(queryset)
-        return ProjectManager.with_counts_annotate(queryset, fields=fields).prefetch_related('members', 'created_by')
+        
+        # Then apply sorting
+        queryset = queryset.annotate(
+            completion_ratio=Case(
+                When(task_number__gt=0, 
+                     then=Cast('finished_task_number', FloatField()) / Cast('task_number', FloatField())),
+                default=Value(0.0),
+                output_field=FloatField(),
+            )
+        )
+        
+        # Apply pinned sorting first, then completion ratio
+        queryset = queryset.order_by(
+            F('pinned_at').desc(nulls_last=True),
+            'completion_ratio',
+            '-created_at'
+        )
+        
+        if filter in ['pinned_only', 'exclude_pinned']:
+            queryset = queryset.filter(pinned_at__isnull=filter == 'exclude_pinned')
+        
+        return queryset.prefetch_related('members', 'created_by')
 
     def get_serializer_context(self):
         context = super(ProjectListAPI, self).get_serializer_context()
