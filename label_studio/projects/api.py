@@ -73,6 +73,8 @@ from rest_framework.exceptions import APIException
 from core.redis import redis_connected
 from django.core.cache import cache
 from typing import Dict, Union, List
+from django.db.models import Case, When, F, FloatField, Value
+from django.db.models.functions import Cast
 
 from label_studio.core.utils.common import load_func
 
@@ -191,26 +193,42 @@ class ProjectListAPI(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
         filter = serializer.validated_data.get('filter')
+        
+        # Base queryset with annotations
         queryset = Project.objects.filter(
             organization=self.request.user.active_organization,
             members__user=self.request.user
-        ).order_by(
-            F('pinned_at').desc(nulls_last=True), '-created_at'
         )
+
+        queryset = ProjectManager.with_counts_annotate(queryset, fields=fields)
+        queryset = annotate_finished_task_number(queryset)
+        queryset = annotate_weekly_annotation_count(queryset)
+
+        queryset = queryset.annotate(
+            completion_ratio=Case(
+                When(
+                    task_number__gt=0,
+                    then=Cast('finished_task_number', FloatField()) / Cast('task_number', FloatField()),
+                ),
+                default=Value(0.0),
+                output_field=FloatField(),
+            )
+        ).order_by(
+            F('pinned_at').desc(nulls_last=True),
+            'completion_ratio',
+            '-created_at',
+        )
+
         if filter in ['pinned_only', 'exclude_pinned']:
             queryset = queryset.filter(pinned_at__isnull=filter == 'exclude_pinned')
-
-        projects = annotate_finished_task_number(queryset)
-        projects = annotate_weekly_annotation_count(projects)
-        projects = ProjectManager.with_counts_annotate(projects, fields=fields)
 
         # Only annotate FSM state for UI/API consumption when both feature flags are enabled
         if flag_set('fflag_feat_fit_568_finite_state_management', user=self.request.user) and flag_set(
             'fflag_feat_fit_710_fsm_state_fields', user=self.request.user
         ):
-            projects = projects.with_state()
+            queryset = queryset.with_state()
 
-        return projects.prefetch_related('members', 'created_by')
+        return queryset.prefetch_related('members', 'created_by')
 
     def get_serializer_context(self):
         context = super(ProjectListAPI, self).get_serializer_context()
