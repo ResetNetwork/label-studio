@@ -60,6 +60,9 @@ export const OrgSwitcher: FC = () => {
     fetchOrganizations();
   }, [fetchOrganizations]);
 
+  // Only render if user has multiple organizations
+  if (organizations.length <= 1) return null;
+
   return (
     <Block name="org-switcher">
       <Elem name="header">
