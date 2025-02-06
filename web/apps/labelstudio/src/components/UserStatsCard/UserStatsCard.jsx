@@ -81,15 +81,43 @@ export const UserStatsCard = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await callApi('userMetrics');
+      
+      const response = await callApi('userMetrics', {
+        handleError: false,
+      });
+
+      // Validate response exists
+      if (!response || typeof response !== 'object') {
+        throw new Error('Invalid response format from server');
+      }
+
+      // Check for required fields
+      const requiredFields = [
+        'annotations_today',
+        'annotations_week',
+        'annotations_quarter',
+        'avg_annotation_time',
+        'regularity',
+        'projects_contributed',
+        'total_time_week'
+      ];
+      
+      const missingFields = requiredFields.filter(field => !(field in response));
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required metrics: ${missingFields.join(', ')}`);
+      }
+
       setMetrics(response);
     } catch (err) {
+      console.error('Error fetching metrics:', err);
       setError(err.message || 'Failed to load metrics');
+      
       if (retryCount < 3) {
+        const delay = Math.pow(2, retryCount) * 1000;
         setTimeout(() => {
           setRetryCount(prev => prev + 1);
           fetchMetrics();
-        }, Math.pow(2, retryCount) * 1000);
+        }, delay);
       }
     } finally {
       setLoading(false);
@@ -97,19 +125,25 @@ export const UserStatsCard = () => {
   };
 
   useEffect(() => {
+    console.log('UserStatsCard mounted, initializing metrics fetch');
     fetchMetrics();
+    return () => {
+      console.log('UserStatsCard unmounting');
+    };
   }, []);
 
   const formatMetricValue = (key, value) => {
+    if (value === undefined || value === null) return '0';
+
     switch (key) {
       case 'avg_annotation_time':
         return formatDuration(value);
       case 'regularity':
-        return `${value}%`;
+        return `${Math.round(value)}%`;
       case 'total_time_week':
-        return `${value}h`;
+        return `${parseFloat(value).toFixed(1)}h`;
       default:
-        return value.toLocaleString();
+        return parseInt(value).toLocaleString();
     }
   };
 

@@ -988,18 +988,7 @@ class UserMetricsAPI(generics.RetrieveAPIView):
         )
 
     def _calculate_metrics(self, user_id: int, org_id: int) -> Dict[str, Union[int, float]]:
-        """Calculate user metrics with optimized database queries
-        
-        Args:
-            user_id: The ID of the user
-            org_id: The ID of the user's active organization
-            
-        Returns:
-            Dict containing the calculated metrics
-            
-        Raises:
-            APIException: If there's an error calculating the metrics
-        """
+        """Calculate user metrics with optimized database queries"""
         try:
             now = timezone.now()
             start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1014,32 +1003,21 @@ class UserMetricsAPI(generics.RetrieveAPIView):
                 week=Count('id', filter=Q(created_at__gte=week_ago)),
                 quarter=Count('id', filter=Q(created_at__gte=now - timedelta(days=90))),
                 projects_contributed=Count('project_id', distinct=True),
-                total_time_week=ExpressionWrapper(
-                    Sum(
-                        F('updated_at') - F('created_at'),
-                        filter=Q(
-                            created_at__gte=week_ago,
-                            updated_at__isnull=False
-                        )
-                    ),
-                    output_field=DurationField()
+                total_time_week=Sum(
+                    'lead_time',
+                    filter=Q(created_at__gte=week_ago)
                 )
             )
-
-            # Calculate average time using database
-            durations = annotations.filter(
+            
+            # Calculate average time using lead_time
+            lead_times = annotations.filter(
                 created_at__gte=now - timedelta(days=90),
-                updated_at__isnull=False
-            ).annotate(
-                duration=ExpressionWrapper(
-                    F('updated_at') - F('created_at'),
-                    output_field=DurationField()
-                )
-            ).values_list('duration', flat=True)
+                lead_time__isnull=False
+            ).values_list('lead_time', flat=True)
+            
+            avg_time = self._calculate_trimmed_mean(lead_times)
 
-            avg_time = self._calculate_trimmed_mean(durations)
-
-            # Calculate regularity using database
+            # Calculate regularity
             days_with_annotations = annotations.filter(
                 created_at__gte=now - timedelta(days=10)
             ).annotate(
@@ -1047,11 +1025,11 @@ class UserMetricsAPI(generics.RetrieveAPIView):
             ).values('date').annotate(
                 count=Count('id')
             ).filter(count__gte=3).count()
-
-            # Convert total_time_week from timedelta to hours
+            
+            # Convert total_time_week from seconds to hours
             total_hours = 0
             if counts['total_time_week']:
-                total_hours = round(counts['total_time_week'].total_seconds() / 3600, 1)
+                total_hours = round(counts['total_time_week'] / 3600, 1)
 
             metrics = {
                 'annotations_today': counts['today'],
@@ -1073,22 +1051,22 @@ class UserMetricsAPI(generics.RetrieveAPIView):
             logger.error(f"Error calculating metrics for user {user_id}: {str(e)}", exc_info=True)
             raise APIException("Failed to calculate metrics")
 
-    def _calculate_trimmed_mean(self, durations: List[timedelta]) -> float:
-        """Calculate trimmed mean of durations, excluding top/bottom 10%
+    def _calculate_trimmed_mean(self, lead_times: List[float]) -> float:
+        """Calculate trimmed mean of lead times, excluding top/bottom 10%
         
         Args:
-            durations: List of timedelta objects
+            lead_times: List of lead times in seconds
             
         Returns:
-            float: The trimmed mean in seconds, or 0 if no valid durations
+            float: The trimmed mean in seconds, or 0 if no valid times
         """
-        if not durations:
+        if not lead_times:
             return 0
         
-        # Convert to seconds and filter invalid
+        # Filter invalid and sort
         seconds = sorted(
-            d.total_seconds() for d in durations 
-            if d and d.total_seconds() > 0
+            t for t in lead_times 
+            if t and t > 0
         )
         
         if not seconds:
