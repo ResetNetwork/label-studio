@@ -420,22 +420,22 @@ class OrganizationResetTokenAPI(APIView):
 
 @method_decorator(
     name='post',
-    decorator=swagger_auto_schema(
+    decorator=extend_schema(
         tags=['Organizations'],
-        operation_summary='Set active organization',
-        operation_description='Set the active organization for the current user.',
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'organization_id': openapi.Schema(type=openapi.TYPE_INTEGER),
-            },
-            required=['organization_id'],
-        ),
+        summary='Set active organization',
+        description='Set the active organization for the current user.',
+        request={
+            'application/json': {
+                'type': 'object',
+                'required': ['organization_id'],
+                'properties': {'organization_id': {'type': 'integer'}},
+            }
+        },
         responses={
-            200: 'Success',
-            404: 'Organization not found',
-            403: 'Permission denied'
-        }
+            200: OpenApiResponse(description='Success'),
+            403: OpenApiResponse(description='Permission denied'),
+            404: OpenApiResponse(description='Organization not found'),
+        },
     ),
 )
 class ActiveOrganizationAPI(APIView):

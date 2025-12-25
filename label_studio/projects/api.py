@@ -5,7 +5,6 @@ import os
 import pathlib
 from datetime import datetime, timedelta
 
-import drf_yasg.openapi as openapi
 from core.feature_flags import flag_set
 from core.filters import ListFilter
 from core.label_config import config_essential_data_has_changed
@@ -25,7 +24,8 @@ from django.http import Http404
 from django.utils.decorators import method_decorator
 from django_filters import CharFilter, FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_yasg.utils import swagger_auto_schema
+from django.db.models import Case, FloatField, Value, When
+from django.db.models.functions import Cast
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from label_studio_sdk.label_interface.interface import LabelInterface
@@ -73,8 +73,6 @@ from rest_framework.exceptions import APIException
 from core.redis import redis_connected
 from django.core.cache import cache
 from typing import Dict, Union, List
-from django.db.models import Case, When, F, FloatField, Value
-from django.db.models.functions import Cast
 
 from label_studio.core.utils.common import load_func
 
@@ -951,83 +949,31 @@ class ProjectAnnotatorsAPI(generics.RetrieveAPIView):
         data = UserSimpleSerializer(users, many=True, context={'request': request}).data
         return Response(data)
 
-@swagger_auto_schema(
+@extend_schema(
     tags=['Users'],
-    operation_summary='Get user metrics',
-    operation_description='''
-    Get metrics about the current user's annotation activity.
-    
-    Returns:
-    - annotations_today: Number of annotations created today
-    - annotations_week: Number of annotations created in the last 7 days
-    - annotations_quarter: Number of annotations created in the last 90 days
-    - avg_annotation_time: Average time per annotation in seconds (excluding top/bottom 10%)
-    - regularity: Percentage of last 10 days with 3+ annotations
-    - projects_contributed: Number of different projects contributed to
-    - total_time_week: Total time spent annotating this week in hours
-    ''',
+    summary='Get user metrics',
+    description=(
+        "Get metrics about the current user's annotation activity. "
+        "Returns daily/weekly/quarterly counts, trimmed mean annotation time, regularity, "
+        "projects contributed, and total time spent annotating this week."
+    ),
     responses={
-        200: openapi.Response(
+        200: OpenApiResponse(
             description='User metrics',
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'annotations_today': openapi.Schema(
-                        type=openapi.TYPE_INTEGER,
-                        description='Number of annotations created today'
-                    ),
-                    'annotations_week': openapi.Schema(
-                        type=openapi.TYPE_INTEGER,
-                        description='Number of annotations created in the last 7 days'
-                    ),
-                    'annotations_quarter': openapi.Schema(
-                        type=openapi.TYPE_INTEGER,
-                        description='Number of annotations created in the last 90 days'
-                    ),
-                    'avg_annotation_time': openapi.Schema(
-                        type=openapi.TYPE_NUMBER,
-                        description='Average time per annotation in seconds (excluding top/bottom 10%)'
-                    ),
-                    'regularity': openapi.Schema(
-                        type=openapi.TYPE_INTEGER,
-                        description='Percentage of last 10 days with 3+ annotations'
-                    ),
-                    'projects_contributed': openapi.Schema(
-                        type=openapi.TYPE_INTEGER,
-                        description='Number of different projects contributed to'
-                    ),
-                    'total_time_week': openapi.Schema(
-                        type=openapi.TYPE_NUMBER,
-                        description='Total time spent annotating this week in hours'
-                    )
-                }
-            )
+            response={
+                'type': 'object',
+                'properties': {
+                    'annotations_today': {'type': 'integer'},
+                    'annotations_week': {'type': 'integer'},
+                    'annotations_quarter': {'type': 'integer'},
+                    'avg_annotation_time': {'type': 'number'},
+                    'regularity': {'type': 'integer'},
+                    'projects_contributed': {'type': 'integer'},
+                    'total_time_week': {'type': 'number'},
+                },
+            },
         ),
-        400: openapi.Response(
-            description='Bad request',
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'detail': openapi.Schema(
-                        type=openapi.TYPE_STRING,
-                        description='Error message'
-                    )
-                }
-            )
-        ),
-        500: openapi.Response(
-            description='Internal server error',
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'detail': openapi.Schema(
-                        type=openapi.TYPE_STRING,
-                        description='Error message'
-                    )
-                }
-            )
-        )
-    }
+    },
 )
 class UserMetricsAPI(generics.RetrieveAPIView):
     """API endpoint for retrieving user annotation metrics.
