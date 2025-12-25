@@ -20,26 +20,17 @@ export const OrgSwitcher: FC = () => {
 
   const fetchOrganizations = useCallback(async () => {
     try {
-      console.log("Fetching organizations...");
       const response = await callApi<OrganizationsResponse>("userOrganizations");
-      console.log("Organizations response:", response);
       
       if (response?.organizations) {
         setOrganizations(response.organizations);
-      } else {
-        console.error("No organizations found in response:", response);
       }
     } catch (error: unknown) {
-      console.error("Failed to fetch organizations:", error);
-      if (error && typeof error === 'object' && 'response' in error) {
-        console.error("Error response:", (error as any).response);
-      }
     }
   }, [callApi]);
 
   const switchOrganization = useCallback(async (orgId: number) => {
     try {
-      console.log("Switching to organization:", orgId);
       await callApi("setActiveOrganization", {
         body: {
           organization_id: orgId
@@ -49,10 +40,6 @@ export const OrgSwitcher: FC = () => {
       await fetchOrganizations();
       window.location.reload();
     } catch (error: unknown) {
-      console.error("Failed to switch organization:", error);
-      if (error && typeof error === 'object' && 'response' in error) {
-        console.error("Error response:", (error as any).response);
-      }
     }
   }, [callApi, fetchOrganizations]);
 
