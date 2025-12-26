@@ -13,17 +13,10 @@ import { getEmoji } from "./ProjectsUtils";
 const DEFAULT_CARD_COLORS = ["#FFFFFF", "#FDFDFC"];
 
 export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, pageSize }) => {
-  // Sort projects by completion percentage
-  const sortedProjects = [...projects].sort((a, b) => {
-    const completionA = a.task_number > 0 ? (a.finished_task_number / a.task_number) : 0;
-    const completionB = b.task_number > 0 ? (b.finished_task_number / b.task_number) : 0;
-    return completionA - completionB; // Sort ascending (least complete first)
-  });
-
   return (
     <>
       <div className={cn("projects-page").elem("list").toClassName()}>
-        {sortedProjects.map((project) => (
+        {projects.map((project) => (
           <ProjectCard key={project.id} project={project} />
         ))}
       </div>
@@ -84,6 +77,7 @@ const ProjectCard = ({ project }) => {
     project?.task_number > 0 ? Math.round((project.finished_task_number / project.task_number) * 100) : 0;
 
   const emoji = getEmoji(project.weekly_annotation_count, project.task_number, project.finished_task_number);
+  const weekly = project.weekly_annotation_count ?? 0;
 
   return (
     <NavLink className={cn("projects-page").elem("link").toClassName()} to={`/projects/${project.id}/data`} data-external>
@@ -95,6 +89,12 @@ const ProjectCard = ({ project }) => {
                 <div className={cn("project-card").elem("title-text").toClassName()}>{project.title ?? "New project"}</div>
               </Tooltip>
             </div>
+
+            {weekly > 0 && (
+              <Tooltip title={`${weekly} annotations created this week`}>
+                <div className={cn("project-card").elem("weekly").toClassName()}>+{weekly}wk</div>
+              </Tooltip>
+            )}
 
             <div
               className={cn("project-card").elem("menu").toClassName()}
@@ -159,6 +159,7 @@ const ProjectCard = ({ project }) => {
               }}
             />
           </div>
+          <div className={cn("project-card").elem("progress-text").toClassName()}>{progressPercentage}%</div>
           <div className={cn("project-card").elem("emoji").toClassName()}>{emoji}</div>
         </div>
 
