@@ -70,7 +70,7 @@ const MetricItem = ({ label, value, tooltip, metricKey }) => (
   </div>
 );
 
-export const UserStatsCard = () => {
+export const UserStatsCard = ({ projectKpis = [] }) => {
   const { callApi } = useAPI();
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -206,6 +206,19 @@ export const UserStatsCard = () => {
               metricKey={key}
             />
           ))}
+          {projectKpis.length > 0 && (
+            <>
+              <div className={cn("user-stats").elem("divider").toClassName()} />
+              {projectKpis.map((kpi) => (
+                <div key={kpi.label} className={cn("user-stats").elem("metric").toClassName()} role="listitem">
+                  <div className={cn("user-stats").elem("metric-content").toClassName()}>
+                    <div className={cn("user-stats").elem("value").toClassName()}>{kpi.value}</div>
+                    <div className={cn("user-stats").elem("label").toClassName()}>{kpi.label}</div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

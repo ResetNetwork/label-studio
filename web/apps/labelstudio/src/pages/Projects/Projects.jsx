@@ -46,6 +46,7 @@ export const ProjectsPage = () => {
   const [modal, setModal] = React.useState(false);
   const [query, setQuery] = useState("");
   const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [activeOnly, setActiveOnly] = useState(true); // Hide 100% complete by default
   const [sortKey, setSortKey] = useState(SORT_OPTIONS[0].key);
 
   const openModal = () => setModal(true);
@@ -141,6 +142,14 @@ export const ProjectsPage = () => {
       results = results.filter((p) => Boolean(p.pinned_at));
     }
 
+    if (activeOnly) {
+      results = results.filter((p) => {
+        const tasks = p.task_number ?? 0;
+        const done = p.finished_task_number ?? 0;
+        return tasks > 0 && done < tasks; // Show only if has tasks AND not 100% complete
+      });
+    }
+
     if (q) {
       results = results.filter((p) => {
         const title = (p.title ?? "").toLowerCase();
@@ -174,7 +183,7 @@ export const ProjectsPage = () => {
     };
 
     return [...results].sort(sortFn);
-  }, [projectsList, pinnedOnly, query, sortKey]);
+  }, [projectsList, pinnedOnly, activeOnly, query, sortKey]);
 
   const kpis = useMemo(() => {
     const taskTotal = visibleProjects.reduce((sum, p) => sum + (p.task_number ?? 0), 0);
@@ -183,11 +192,11 @@ export const ProjectsPage = () => {
     const completion = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 100) : 0;
 
     return [
-      { label: "Projects", value: `${visibleProjects.length}/${totalItems}` },
-      { label: "Tasks (page)", value: taskTotal.toLocaleString() },
-      { label: "Labeled (page)", value: taskDone.toLocaleString() },
-      { label: "This week (page)", value: weekly.toLocaleString() },
-      { label: "Completion (page)", value: `${completion}%` },
+      { label: "Showing", value: visibleProjects.length + "/" + totalItems },
+      { label: "Tasks", value: taskTotal.toLocaleString() },
+      { label: "Done", value: taskDone.toLocaleString() },
+      { label: "Week", value: "+" + weekly.toLocaleString() },
+      { label: "Progress", value: completion + "%" },
     ];
   }, [totalItems, visibleProjects]);
 
@@ -205,27 +214,34 @@ export const ProjectsPage = () => {
 
             <div className={cn("projects-page").elem("toolbar").toClassName()}>
               <div className={cn("projects-page").elem("search").toClassName()}>
-                <label className={cn("projects-page").elem("search-label").toClassName()} htmlFor="projects-search">
-                  Search
-                </label>
                 <input
                   id="projects-search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className={cn("projects-page").elem("search-input").toClassName()}
-                  placeholder="Project title or description…"
+                  placeholder="Search projects…"
                 />
               </div>
 
               <Space>
                 <Button
-                  look="outlined"
+                  look={activeOnly ? "primary" : "outlined"}
+                  size="small"
+                  onClick={() => setActiveOnly((prev) => !prev)}
+                  aria-pressed={activeOnly}
+                  aria-label="Toggle active projects only"
+                >
+                  {activeOnly ? "Active" : "All"}
+                </Button>
+
+                <Button
+                  look={pinnedOnly ? "primary" : "outlined"}
                   size="small"
                   onClick={() => setPinnedOnly((prev) => !prev)}
                   aria-pressed={pinnedOnly}
                   aria-label="Toggle pinned projects only"
                 >
-                  {pinnedOnly ? "Pinned only" : "All projects"}
+                  Pinned
                 </Button>
 
                 <Dropdown.Trigger
@@ -240,27 +256,14 @@ export const ProjectsPage = () => {
                   }
                 >
                   <Button look="outlined" size="small" aria-label="Sort projects">
-                    Sort: {SORT_OPTIONS.find((o) => o.key === sortKey)?.label ?? "Least complete"}
+                    {SORT_OPTIONS.find((o) => o.key === sortKey)?.label ?? "Sort"}
                   </Button>
                 </Dropdown.Trigger>
               </Space>
             </div>
 
             <div className={cn("projects-page").elem("stats").toClassName()}>
-              <UserStatsCard />
-
-              <div className={cn("projects-page").elem("kpis").toClassName()}>
-                {kpis.map((kpi) => (
-                  <div key={kpi.label} className={cn("projects-page").elem("kpi").toClassName()}>
-                    <Typography size="small" className={cn("projects-page").elem("kpi-label").toClassName()}>
-                      {kpi.label}
-                    </Typography>
-                    <Typography className={cn("projects-page").elem("kpi-value").toClassName()}>
-                      {kpi.value}
-                    </Typography>
-                  </div>
-                ))}
-              </div>
+              <UserStatsCard projectKpis={kpis} />
             </div>
           </div>
           {visibleProjects.length ? (
@@ -292,7 +295,7 @@ ProjectsPage.routes = ({ store }) => [
     component: () => {
       const params = useRouterParams();
 
-      return <Redirect to={`/projects/${params.id}/data`} />;
+      return <Redirect to={"/projects/" + params.id + "/data"} />;
     },
     pages: {
       DataManagerPage,
