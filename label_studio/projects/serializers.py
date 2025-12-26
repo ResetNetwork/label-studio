@@ -167,6 +167,21 @@ class ProjectSerializer(FlexFieldsModelSerializer):
         # If all checks pass, return True
         return True
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        counters = self.context.get('project_counters')
+        if not counters:
+            return data
+
+        project_values = counters.get(getattr(instance, 'id', None))
+        if not project_values:
+            return data
+
+        for key, value in project_values.items():
+            if key in data:
+                data[key] = value
+        return data
+
     @staticmethod
     def get_parsed_label_config(project):
         return project.get_parsed_config()

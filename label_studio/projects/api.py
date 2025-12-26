@@ -30,7 +30,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from label_studio_sdk.label_interface.interface import LabelInterface
 from ml.serializers import MLBackendSerializer
-from projects.functions import annotate_finished_task_number, annotate_task_number, annotate_weekly_annotation_count
+from projects.functions import annotate_finished_task_number, annotate_weekly_annotation_count
 from projects.functions.next_task import get_next_task
 from projects.functions.stream_history import get_label_stream_history
 from projects.functions.utils import recalculate_created_annotations_and_labels_from_scratch
@@ -191,6 +191,8 @@ class ProjectListAPI(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
         filter = serializer.validated_data.get('filter')
+        ids = self.request.query_params.get('ids')
+        include_counter_fields = bool(fields and any(f in ProjectManager.ANNOTATED_FIELDS for f in fields))
         
         # Base queryset with annotations
         queryset = Project.objects.filter(
@@ -198,24 +200,15 @@ class ProjectListAPI(generics.ListCreateAPIView):
             members__user=self.request.user
         )
 
-        queryset = ProjectManager.with_counts_annotate(queryset, fields=fields)
-        # Ensure task_number is available for completion_ratio calculation even if the client doesn't request it.
-        queryset = annotate_task_number(queryset)
-        queryset = annotate_finished_task_number(queryset)
-        queryset = annotate_weekly_annotation_count(queryset)
+        # When the frontend requests per-project counters for a fixed `ids` list (Projects page),
+        # avoid correlated subqueries per project. Counters are computed in bulk and injected in the serializer.
+        if not (ids and include_counter_fields):
+            queryset = ProjectManager.with_counts_annotate(queryset, fields=fields)
+            queryset = annotate_finished_task_number(queryset)
+            queryset = annotate_weekly_annotation_count(queryset)
 
-        queryset = queryset.annotate(
-            completion_ratio=Case(
-                When(
-                    task_number__gt=0,
-                    then=Cast('finished_task_number', FloatField()) / Cast('task_number', FloatField()),
-                ),
-                default=Value(0.0),
-                output_field=FloatField(),
-            )
-        ).order_by(
+        queryset = queryset.order_by(
             F('pinned_at').desc(nulls_last=True),
-            'completion_ratio',
             '-created_at',
         )
 
@@ -233,7 +226,119 @@ class ProjectListAPI(generics.ListCreateAPIView):
     def get_serializer_context(self):
         context = super(ProjectListAPI, self).get_serializer_context()
         context['created_by'] = self.request.user
+
+        ids = self.request.query_params.get('ids')
+        include = self.request.query_params.get('include') or ''
+        requested_fields = {f.strip() for f in include.split(',') if f.strip()}
+
+        requested_counters = {
+            field for field in requested_fields if field in ProjectManager.ANNOTATED_FIELDS or field == 'weekly_annotation_count'
+        }
+
+        if ids and requested_counters:
+            try:
+                project_ids = [int(x) for x in ids.split(',') if x]
+            except ValueError:
+                project_ids = []
+
+            if project_ids:
+                context['project_counters'] = self._bulk_project_counters(project_ids, requested_counters)
+
         return context
+
+    def _bulk_project_counters(self, project_ids: List[int], requested: set[str]) -> Dict[int, Dict[str, int]]:
+        """Compute project counters in bulk for a bounded list of project IDs.
+
+        This avoids per-project correlated subqueries which can be very slow on large task/annotation tables.
+        """
+        counters: Dict[int, Dict[str, int]] = {project_id: {} for project_id in project_ids}
+
+        def assign(results, field_name: str):
+            for row in results:
+                pid = row['project_id']
+                if pid in counters:
+                    counters[pid][field_name] = int(row['count'])
+
+        if 'task_number' in requested:
+            assign(
+                Task.objects.filter(project_id__in=project_ids)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'task_number',
+            )
+
+        if 'finished_task_number' in requested:
+            assign(
+                Task.objects.filter(project_id__in=project_ids, is_labeled=True)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'finished_task_number',
+            )
+
+        if 'total_predictions_number' in requested:
+            from tasks.models import Prediction
+
+            assign(
+                Prediction.objects.filter(project_id__in=project_ids)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'total_predictions_number',
+            )
+
+        if 'total_annotations_number' in requested:
+            assign(
+                Annotation.objects.filter(project_id__in=project_ids, was_cancelled=False)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'total_annotations_number',
+            )
+
+        if 'useful_annotation_number' in requested:
+            assign(
+                Annotation.objects.filter(
+                    project_id__in=project_ids, was_cancelled=False, ground_truth=False, result__isnull=False
+                )
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'useful_annotation_number',
+            )
+
+        if 'ground_truth_number' in requested:
+            assign(
+                Annotation.objects.filter(project_id__in=project_ids, ground_truth=True)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'ground_truth_number',
+            )
+
+        if 'skipped_annotations_number' in requested:
+            assign(
+                Annotation.objects.filter(project_id__in=project_ids, was_cancelled=True)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'skipped_annotations_number',
+            )
+
+        if 'num_tasks_with_annotations' in requested:
+            assign(
+                Annotation.objects.filter(
+                    project_id__in=project_ids, ground_truth=False, was_cancelled=False, result__isnull=False
+                )
+                .values('project_id')
+                .annotate(count=Count('task_id', distinct=True)),
+                'num_tasks_with_annotations',
+            )
+
+        if 'weekly_annotation_count' in requested:
+            one_week_ago = timezone.now() - timedelta(days=7)
+            assign(
+                Annotation.objects.filter(project_id__in=project_ids, created_at__gte=one_week_ago, was_cancelled=False)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'weekly_annotation_count',
+            )
+
+        return counters
 
     def perform_create(self, ser):
         try:
