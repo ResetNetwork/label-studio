@@ -192,7 +192,8 @@ class ProjectListAPI(generics.ListCreateAPIView):
         fields = serializer.validated_data.get('include')
         filter = serializer.validated_data.get('filter')
         ids = self.request.query_params.get('ids')
-        include_counter_fields = bool(fields and any(f in ProjectManager.ANNOTATED_FIELDS for f in fields))
+        requested_fields = set(fields or [])
+        include_counter_fields = bool(requested_fields and any(f in ProjectManager.ANNOTATED_FIELDS for f in requested_fields))
         
         # Base queryset with annotations
         queryset = Project.objects.filter(
@@ -204,8 +205,10 @@ class ProjectListAPI(generics.ListCreateAPIView):
         # avoid correlated subqueries per project. Counters are computed in bulk and injected in the serializer.
         if not (ids and include_counter_fields):
             queryset = ProjectManager.with_counts_annotate(queryset, fields=fields)
-            queryset = annotate_finished_task_number(queryset)
-            queryset = annotate_weekly_annotation_count(queryset)
+            if 'finished_task_number' in requested_fields:
+                queryset = annotate_finished_task_number(queryset)
+            if 'weekly_annotation_count' in requested_fields:
+                queryset = annotate_weekly_annotation_count(queryset)
 
         queryset = queryset.order_by(
             F('pinned_at').desc(nulls_last=True),
