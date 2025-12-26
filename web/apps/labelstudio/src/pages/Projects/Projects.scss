@@ -273,7 +273,10 @@
   }
 
   &__info {
-    display: none;
+    display: flex;
+    align-items: center;
+    padding: 16px 16px 10px;
+    justify-content: space-between;
   }
 
   &_colored {
