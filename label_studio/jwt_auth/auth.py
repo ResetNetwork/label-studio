@@ -19,27 +19,35 @@ class TokenAuthenticationPhaseout(TokenAuthentication):
 
         auth_result = super().authenticate(request)
 
-        # Update CurrentContext with authenticated user
-        if auth_result is not None:
-            user, _ = auth_result
-            CurrentContext.set_user(user)
+        if auth_result is None:
+            return None
 
         JWT_ACCESS_TOKEN_ENABLED = flag_set('fflag__feature_develop__prompts__dia_1829_jwt_token_auth')
-        if JWT_ACCESS_TOKEN_ENABLED and (auth_result is not None):
+        if JWT_ACCESS_TOKEN_ENABLED:
             user, _ = auth_result
             org = user.active_organization
             org_id = org.id if org else None
 
             # raise 401 if legacy API token auth disabled (i.e. this token is no longer valid)
             if org and (not org.jwt.legacy_api_tokens_enabled):
-                raise AuthenticationFailed(
-                    'Authentication token no longer valid: legacy token authentication has been disabled for this organization'
+                # Allow SessionAuthentication to handle browser sessions even if a stale legacy
+                # `Authorization: Token ...` header is present.
+                logger.info(
+                    'Legacy token authentication ignored (disabled for organization)',
+                    extra={'user_id': user.id, 'organization_id': org_id, 'endpoint': request.path},
                 )
+                return None
 
+            CurrentContext.set_user(user)
             logger.info(
                 'Legacy token authentication used',
                 extra={'user_id': user.id, 'organization_id': org_id, 'endpoint': request.path},
             )
+            return auth_result
+
+        # Legacy token auth phaseout behavior disabled: treat a token as valid authentication.
+        user, _ = auth_result
+        CurrentContext.set_user(user)
         return auth_result
 
 
