@@ -74,12 +74,12 @@
   }
 
   &__toolbar {
-    width: 100%;
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: 16px;
     flex-wrap: wrap;
+    flex: 1 1 520px;
   }
 
   &__search {
@@ -228,9 +228,9 @@
   &__weekly {
     font-size: 12px;
     font-weight: 600;
-    color: var(--color-primary-content);
+    color: var(--color-primary-surface-content);
     background: var(--color-primary-surface);
-    border: 1px solid var(--color-primary-border-subtle);
+    border: 1px solid var(--color-primary-border);
     border-radius: 999px;
     padding: 4px 8px;
     white-space: nowrap;
