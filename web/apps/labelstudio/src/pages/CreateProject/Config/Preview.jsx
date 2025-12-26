@@ -124,7 +124,6 @@ export const Preview = ({ config, data, error, loading, project }) => {
         });
 
         store.annotationStore.selectAnnotation(c.id);
-        console.log("LSF updated");
       }
     });
   }, [currentConfig, currentTask, storeReady]);

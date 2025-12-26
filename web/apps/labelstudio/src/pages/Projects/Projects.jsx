@@ -199,67 +199,68 @@ export const ProjectsPage = () => {
         </div>
         <div className={cn("projects-page").elem("content").toClassName()} case="loaded">
           <div className={cn("projects-page").elem("header").toClassName()}>
-            <Space spread className={cn("projects-page").elem("header-row").toClassName()}>
+            <div className={cn("projects-page").elem("org").toClassName()}>
               <OrgSwitcher />
-              <div className={cn("projects-page").elem("toolbar").toClassName()}>
-                <div className={cn("projects-page").elem("search").toClassName()}>
-                  <label className={cn("projects-page").elem("search-label").toClassName()} htmlFor="projects-search">
-                    Search
-                  </label>
-                  <input
-                    id="projects-search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className={cn("projects-page").elem("search-input").toClassName()}
-                    placeholder="Project title or description…"
-                  />
-                </div>
+            </div>
 
-                <Space>
-                  <Button
-                    look="outlined"
-                    size="small"
-                    onClick={() => setPinnedOnly((prev) => !prev)}
-                    aria-pressed={pinnedOnly}
-                    aria-label="Toggle pinned projects only"
-                  >
-                    {pinnedOnly ? "Pinned only" : "All projects"}
-                  </Button>
-
-                  <Dropdown.Trigger
-                    content={
-                      <Menu contextual>
-                        {SORT_OPTIONS.map((opt) => (
-                          <Menu.Item
-                            key={opt.key}
-                            onClick={() => setSortKey(opt.key)}
-                            active={opt.key === sortKey}
-                          >
-                            {opt.label}
-                          </Menu.Item>
-                        ))}
-                      </Menu>
-                    }
-                  >
-                    <Button look="outlined" size="small" aria-label="Sort projects">
-                      Sort: {SORT_OPTIONS.find((o) => o.key === sortKey)?.label ?? "Least complete"}
-                    </Button>
-                  </Dropdown.Trigger>
-                </Space>
+            <div className={cn("projects-page").elem("toolbar").toClassName()}>
+              <div className={cn("projects-page").elem("search").toClassName()}>
+                <label className={cn("projects-page").elem("search-label").toClassName()} htmlFor="projects-search">
+                  Search
+                </label>
+                <input
+                  id="projects-search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className={cn("projects-page").elem("search-input").toClassName()}
+                  placeholder="Project title or description…"
+                />
               </div>
-            </Space>
 
-            <UserStatsCard />
+              <Space>
+                <Button
+                  look="outlined"
+                  size="small"
+                  onClick={() => setPinnedOnly((prev) => !prev)}
+                  aria-pressed={pinnedOnly}
+                  aria-label="Toggle pinned projects only"
+                >
+                  {pinnedOnly ? "Pinned only" : "All projects"}
+                </Button>
 
-            <div className={cn("projects-page").elem("kpis").toClassName()}>
-              {kpis.map((kpi) => (
-                <div key={kpi.label} className={cn("projects-page").elem("kpi").toClassName()}>
-                  <Typography size="small" className={cn("projects-page").elem("kpi-label").toClassName()}>
-                    {kpi.label}
-                  </Typography>
-                  <Typography className={cn("projects-page").elem("kpi-value").toClassName()}>{kpi.value}</Typography>
-                </div>
-              ))}
+                <Dropdown.Trigger
+                  content={
+                    <Menu contextual>
+                      {SORT_OPTIONS.map((opt) => (
+                        <Menu.Item key={opt.key} onClick={() => setSortKey(opt.key)} active={opt.key === sortKey}>
+                          {opt.label}
+                        </Menu.Item>
+                      ))}
+                    </Menu>
+                  }
+                >
+                  <Button look="outlined" size="small" aria-label="Sort projects">
+                    Sort: {SORT_OPTIONS.find((o) => o.key === sortKey)?.label ?? "Least complete"}
+                  </Button>
+                </Dropdown.Trigger>
+              </Space>
+            </div>
+
+            <div className={cn("projects-page").elem("stats").toClassName()}>
+              <UserStatsCard />
+
+              <div className={cn("projects-page").elem("kpis").toClassName()}>
+                {kpis.map((kpi) => (
+                  <div key={kpi.label} className={cn("projects-page").elem("kpi").toClassName()}>
+                    <Typography size="small" className={cn("projects-page").elem("kpi-label").toClassName()}>
+                      {kpi.label}
+                    </Typography>
+                    <Typography className={cn("projects-page").elem("kpi-value").toClassName()}>
+                      {kpi.value}
+                    </Typography>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           {visibleProjects.length ? (

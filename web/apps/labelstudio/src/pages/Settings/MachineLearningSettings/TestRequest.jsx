@@ -6,7 +6,6 @@ import { Typography } from "@humansignal/ui";
 export const TestRequest = ({ backend }) => {
   const api = useAPI();
   const [testResponse, setTestResponse] = useState({});
-  console.log(testResponse.url);
 
   const sendTestRequest = useCallback(
     async (backend) => {
