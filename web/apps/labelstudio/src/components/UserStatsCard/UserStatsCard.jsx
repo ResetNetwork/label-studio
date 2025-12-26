@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Spin } from 'antd';
+import { Tooltip } from "@humansignal/ui";
 import { useAPI } from '../../providers/ApiProvider';
 import { formatDuration } from '../../utils/format';
-import { Block, Elem } from '../../utils/bem';
-import { Tooltip } from '../../components/Tooltip/Tooltip';
+import { cn } from '../../utils/bem';
 import './UserStatsCard.scss';
 
 const getMetricEmoji = (key, value) => {
@@ -58,16 +58,16 @@ const getMetricEmoji = (key, value) => {
 };
 
 const MetricItem = ({ label, value, tooltip, metricKey }) => (
-  <Elem name="metric" role="listitem">
+  <div className={cn("user-stats").elem("metric").toClassName()} role="listitem">
     <Tooltip title={tooltip}>
-      <Elem name="metric-content">
-        <Elem name="value" aria-label={`${value} ${label}`}>
+      <div className={cn("user-stats").elem("metric-content").toClassName()}>
+        <div className={cn("user-stats").elem("value").toClassName()} aria-label={`${value} ${label}`}>
           {value} {getMetricEmoji(metricKey, typeof value === 'string' ? parseFloat(value) : value)}
-        </Elem>
-        <Elem name="label">{label}</Elem>
-      </Elem>
+        </div>
+        <div className={cn("user-stats").elem("label").toClassName()}>{label}</div>
+      </div>
     </Tooltip>
-  </Elem>
+  </div>
 );
 
 export const UserStatsCard = () => {
@@ -109,7 +109,6 @@ export const UserStatsCard = () => {
 
       setMetrics(response);
     } catch (err) {
-      console.error('Error fetching metrics:', err);
       setError(err.message || 'Failed to load metrics');
       
       if (retryCount < 3) {
@@ -125,11 +124,7 @@ export const UserStatsCard = () => {
   };
 
   useEffect(() => {
-    console.log('UserStatsCard mounted, initializing metrics fetch');
     fetchMetrics();
-    return () => {
-      console.log('UserStatsCard unmounting');
-    };
   }, []);
 
   const formatMetricValue = (key, value) => {
@@ -175,36 +170,33 @@ export const UserStatsCard = () => {
 
   if (error) {
     return (
-      <Block name="user-stats" mod={{ error: true }}>
-        <Elem name="error">
-          <Elem name="error-title">Error loading metrics</Elem>
-          <Elem name="error-message">{error}</Elem>
-          <Elem 
-            tag="button" 
-            name="error-action" 
+      <div className={cn("user-stats").mod({ error: true }).toClassName()}>
+        <div className={cn("user-stats").elem("error").toClassName()}>
+          <div className={cn("user-stats").elem("error-title").toClassName()}>Error loading metrics</div>
+          <div className={cn("user-stats").elem("error-message").toClassName()}>{error}</div>
+          <button
+            className={cn("user-stats").elem("error-action").toClassName()}
             onClick={fetchMetrics}
-            role="button" 
-            tabIndex={0}
           >
             Retry
-          </Elem>
-        </Elem>
-      </Block>
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Block name="user-stats" mod={{ loading }}>
-      <Elem name="header">
-        <Elem name="title">Annotation Stats</Elem>
-      </Elem>
+    <div className={cn("user-stats").mod({ loading }).toClassName()}>
+      <div className={cn("user-stats").elem("header").toClassName()}>
+        <div className={cn("user-stats").elem("title").toClassName()}>Annotation Stats</div>
+      </div>
 
       {loading ? (
-        <Elem name="loading" role="status" aria-label="Loading metrics">
+        <div className={cn("user-stats").elem("loading").toClassName()} role="status" aria-label="Loading metrics">
           <Spin size="large" />
-        </Elem>
+        </div>
       ) : (
-        <Elem name="content" role="list">
+        <div className={cn("user-stats").elem("content").toClassName()} role="list">
           {metrics && Object.entries(metrics).map(([key, value]) => (
             <MetricItem
               key={key}
@@ -214,9 +206,9 @@ export const UserStatsCard = () => {
               metricKey={key}
             />
           ))}
-        </Elem>
+        </div>
       )}
-    </Block>
+    </div>
   );
 };
 

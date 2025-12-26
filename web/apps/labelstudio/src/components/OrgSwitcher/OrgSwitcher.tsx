@@ -1,7 +1,7 @@
 import { FC, useCallback, useState, useEffect } from "react";
 import { useAPI } from "apps/labelstudio/src/providers/ApiProvider";
-import { Block, Elem } from "apps/labelstudio/src/utils/bem";
-import { IconPersonInCircle } from "../../assets/icons";
+import { cn } from "apps/labelstudio/src/utils/bem";
+import { IconPersonInCircle } from "@humansignal/icons";
 import "./OrgSwitcher.scss";
 
 interface Organization {
@@ -51,11 +51,11 @@ export const OrgSwitcher: FC = () => {
   if (organizations.length <= 1) return null;
 
   return (
-    <Block name="org-switcher">
-      <Elem name="header">
+    <div className={cn("org-switcher").toClassName()}>
+      <div className={cn("org-switcher").elem("header").toClassName()}>
         <IconPersonInCircle />
         Organization
-      </Elem>
+      </div>
       <ul className="lsf-main-menu">
         {organizations.map(org => {
           const isActive = org.active;
@@ -75,6 +75,6 @@ export const OrgSwitcher: FC = () => {
           );
         })}
       </ul>
-    </Block>
+    </div>
   );
 }; 
