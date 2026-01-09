@@ -1,8 +1,14 @@
 name: "Update Feature Flags"
 
+# NOTE: Scheduled trigger disabled in ResetNetwork fork.
+# This workflow requires HumanSignal's LaunchDarkly secrets (GIT_PAT,
+# LAUNCHDARKLY_COMMUNITY_SDK_KEY) which we don't have access to.
+# Feature flags are synced via upstream merges from HumanSignal/label-studio.
+# See: https://github.com/ResetNetwork/label-studio/actions/runs/20842864901
+
 on:
-  schedule:
-    - cron: '0 6 * * 1-5'
+  # schedule:
+  #   - cron: '0 6 * * 1-5'
   workflow_call:
     inputs:
       ref:
