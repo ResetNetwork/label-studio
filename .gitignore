@@ -54,6 +54,10 @@ label_studio.sqlite3
 tmp
 .DS_Store
 *.sqlite3
+/all_platforms
+/postgresql
+/label_studio/all_platforms
+/label_studio/postgresql
 label_studio/core/settings/local.py
 deploy/nginx/certs/*
 !deploy/nginx/certs/.placeholder
