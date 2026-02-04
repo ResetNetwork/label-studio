@@ -1,4 +1,5 @@
 import { createRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { IconMicrophone, IconSoundBars } from "@humansignal/icons";
 import { Button } from "@humansignal/ui";
 import { Form, Input } from "antd";
 import { observer } from "mobx-react";
@@ -530,14 +531,13 @@ const HtxTextArea = observer(({ item }) => {
                   look="string"
                   className={cn("textarea-tag").elem("action").toClassName()}
                   aria-label={isListening ? "Stop dictation" : "Start dictation"}
+                  icon={isListening ? <IconSoundBars /> : <IconMicrophone />}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     toggleDictation();
                   }}
-                >
-                  {isListening ? "Stop" : "Mic"}
-                </Button>
+                />
               )}
             </div>
             {showAddButton && (

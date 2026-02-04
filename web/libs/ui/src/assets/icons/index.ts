@@ -179,6 +179,7 @@ export { ReactComponent as IconModel } from "./model.svg";
 export { ReactComponent as IconModels } from "./models.svg";
 export { ReactComponent as IconModelVersion } from "./model-version.svg";
 export { ReactComponent as IconMoveTool } from "./move-tool.svg";
+export { ReactComponent as IconMicrophone } from "./microphone.svg";
 export { ReactComponent as IconNext } from "./next-step.svg";
 export { ReactComponent as IconOctagonAlert } from "./octagon-alert.svg";
 export { ReactComponent as IconOpenAI } from "./openai.svg";
