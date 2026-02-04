@@ -2496,6 +2496,19 @@
         "required": false,
         "default": false
       },
+      "speechRecognition": {
+        "name": "speechRecognition",
+        "description": "Enable browser speech recognition (Chrome only) for dictation into this field. Requires HTTPS (or localhost).",
+        "type": ["true", "false"],
+        "required": false,
+        "default": false
+      },
+      "speechRecognitionLang": {
+        "name": "speechRecognitionLang",
+        "description": "Speech recognition language (BCP-47), e.g. \"en-US\"",
+        "type": "string",
+        "required": false
+      },
       "displayMode": {
         "name": "displayMode",
         "description": "Display mode for the textarea; region-list shows it for every region in regions list",

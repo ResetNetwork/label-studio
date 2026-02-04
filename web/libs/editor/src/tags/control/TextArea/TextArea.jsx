@@ -1,4 +1,4 @@
-import { createRef, useCallback } from "react";
+import { createRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@humansignal/ui";
 import { Form, Input } from "antd";
 import { observer } from "mobx-react";
@@ -68,6 +68,8 @@ const { TextArea } = Input;
  * @param {boolean=} [editable=false]      - Whether to display an editable textarea
  * @param {boolean} [skipDuplicates=false] - Prevent duplicates in textarea inputs
  * @param {boolean=} [transcription=false] - If false, always show editor
+ * @param {boolean} [speechRecognition=false] - Enable browser speech recognition (Chrome only) for dictation into this field
+ * @param {string=} [speechRecognitionLang] - Speech recognition language (BCP-47), e.g. "en-US"
  * @param {tag|region-list} [displayMode=tag] - Display mode for the textarea; region-list shows it for every region in regions list
  * @param {number} [rows]                  - Number of rows in the textarea
  * @param {boolean} [required=false]       - Validate whether content in textarea is required
@@ -88,6 +90,8 @@ const TagAttrs = types.model({
   editable: types.optional(types.boolean, false),
   transcription: false,
   skipduplicates: types.optional(types.boolean, false),
+  speechrecognition: types.optional(types.boolean, false),
+  speechrecognitionlang: types.maybeNull(types.string),
 });
 
 const Model = types
@@ -336,6 +340,27 @@ const TextAreaModel = types.compose(
   VisibilityMixin,
 );
 
+const getSpeechRecognitionClass = () => {
+  return window.SpeechRecognition || window.webkitSpeechRecognition;
+};
+
+const isLocalhost = () => {
+  return (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "[::1]"
+  );
+};
+
+const appendDictation = (prev, next) => {
+  const safePrev = (prev ?? "").trimEnd();
+  const safeNext = String(next ?? "").trim();
+
+  if (!safeNext) return safePrev;
+  if (!safePrev) return safeNext;
+  return `${safePrev} ${safeNext}`;
+};
+
 const HtxTextArea = observer(({ item }) => {
   const rows = Number.parseInt(item.rows);
   const onFocus = useCallback(
@@ -345,11 +370,92 @@ const HtxTextArea = observer(({ item }) => {
     [item],
   );
 
+  const speechRecognitionClass = useMemo(() => {
+    return item.speechrecognition ? getSpeechRecognitionClass() : null;
+  }, [item.speechrecognition]);
+
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+  const currentValueRef = useRef(item._value ?? "");
+
+  useEffect(() => {
+    currentValueRef.current = item._value ?? "";
+  }, [item._value]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.stop?.();
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
+  const toggleDictation = useCallback(() => {
+    if (!item.speechrecognition) return;
+
+    if (!speechRecognitionClass) {
+      InfoModal.warning("Speech recognition is not supported in this browser (Chrome recommended).");
+      return;
+    }
+
+    if (!window.isSecureContext && !isLocalhost()) {
+      InfoModal.warning("Speech recognition requires HTTPS (or localhost) to access the microphone.");
+      return;
+    }
+
+    if (!recognitionRef.current) {
+      const recognition = new speechRecognitionClass();
+
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = item.speechrecognitionlang || window.navigator.language || "en-US";
+
+      recognition.onresult = (event) => {
+        let finalText = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+
+          if (result.isFinal) finalText += result[0]?.transcript ?? "";
+        }
+
+        if (!finalText) return;
+        item.setValue(appendDictation(currentValueRef.current, finalText));
+      };
+
+      recognition.onerror = (event) => {
+        setIsListening(false);
+        InfoModal.warning(`Speech recognition error: ${event?.error ?? "unknown"}`);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    try {
+      if (isListening) {
+        recognitionRef.current.stop();
+        setIsListening(false);
+      } else {
+        recognitionRef.current.start();
+        setIsListening(true);
+      }
+    } catch (e) {
+      setIsListening(false);
+      InfoModal.warning(`Speech recognition failed to start: ${e?.message ?? String(e)}`);
+    }
+  }, [item, isListening, speechRecognitionClass]);
+
   const props = {
     name: item.name,
     value: item._value,
     rows: item.rows,
-    className: "is-search",
+    className: `is-search ${cn("textarea-tag").elem("input").toClassName()}`,
     label: item.label,
     placeholder: item.placeholder,
     disabled: item.isReadOnly(),
@@ -388,7 +494,7 @@ const HtxTextArea = observer(({ item }) => {
 
   const showAddButton = !item.isReadOnly() && (item.showsubmitbutton ?? rows !== 1);
   const itemStyle = {};
-  const textareaClassName = cn("text-area").toClassName();
+  const textareaClassName = cn("textarea-tag").toClassName();
 
   if (showAddButton) itemStyle.marginBottom = 0;
 
@@ -410,11 +516,30 @@ const HtxTextArea = observer(({ item }) => {
           }}
         >
           <Form.Item style={itemStyle}>
-            {rows === 1 ? (
-              <Input {...props} aria-label="TextArea Input" />
-            ) : (
-              <TextArea {...props} aria-label="TextArea Input" />
-            )}
+            <div className={cn("textarea-tag").elem("item").toClassName()}>
+              {rows === 1 ? (
+                <Input {...props} aria-label="TextArea Input" />
+              ) : (
+                <TextArea {...props} aria-label="TextArea Input" />
+              )}
+              {item.speechrecognition && !item.isReadOnly() && (
+                <Button
+                  size="small"
+                  type="text"
+                  variant="neutral"
+                  look="string"
+                  className={cn("textarea-tag").elem("action").toClassName()}
+                  aria-label={isListening ? "Stop dictation" : "Start dictation"}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleDictation();
+                  }}
+                >
+                  {isListening ? "Stop" : "Mic"}
+                </Button>
+              )}
+            </div>
             {showAddButton && (
               <Form.Item>
                 <Button size="small" className="mt-[10px]" type="primary" htmlType="submit">
