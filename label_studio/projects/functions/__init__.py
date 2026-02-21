@@ -1,6 +1,7 @@
 from core.feature_flags import flag_set
 from core.utils.db import SQCount
-from django.db.models import Count, OuterRef, Q
+from django.db.models import Count, IntegerField, OuterRef, Q, Subquery
+from django.db.models.functions import Coalesce
 from tasks.models import Annotation, Prediction, Task
 from django.utils import timezone
 from datetime import timedelta
@@ -30,16 +31,20 @@ def annotate_total_annotations_number(queryset):
 
 
 def annotate_num_tasks_with_annotations(queryset):
-    # @todo: check do we really need this counter?
-    # this function is very slow because of tasks__id and distinct
     subquery = (
         Annotation.objects.filter(
             Q(project=OuterRef('pk')) & Q(ground_truth=False) & Q(was_cancelled=False) & Q(result__isnull=False)
         )
-        .values('task__id')
-        .distinct()
+        .values('project')
+        .annotate(c=Count('task_id', distinct=True))
+        .values('c')[:1]
     )
-    return queryset.annotate(num_tasks_with_annotations=SQCount(subquery))
+    return queryset.annotate(
+        num_tasks_with_annotations=Coalesce(
+            Subquery(subquery, output_field=IntegerField()),
+            0,
+        )
+    )
 
 
 def annotate_useful_annotation_number(queryset):
