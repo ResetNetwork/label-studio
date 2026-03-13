@@ -9,6 +9,7 @@ export const API_CONFIG = {
     me: "/current-user/whoami",
     hotkeys: "GET:/current-user/hotkeys/",
     updateHotkeys: "PATCH:/current-user/hotkeys/",
+    userMetrics: "/projects/user-metrics",
 
     // Organization
     memberships: "/organizations/:pk/memberships",
@@ -95,6 +96,9 @@ export const API_CONFIG = {
 
     // FSM
     fsmStateHistory: "GET:/fsm/entities/:entityType/:entityId/history",
+    // Organizations
+    userOrganizations: "/me/organizations",
+    setActiveOrganization: "POST:/me/active-organization",
   },
   alwaysExpectJSON: false,
 };
