@@ -2,6 +2,7 @@
 
 import datetime
 from typing import Optional
+import os
 
 from core.feature_flags import flag_set
 from core.utils.common import load_func
@@ -19,6 +20,9 @@ from organizations.models import Organization
 from rest_framework.authtoken.models import Token
 from users.functions import hash_upload
 from users.functions.last_activity import get_user_last_activity, schedule_activity_sync, set_user_last_activity
+
+from dotenv import load_dotenv
+load_dotenv()
 
 YEAR_START = 1980
 YEAR_CHOICES = []
@@ -185,6 +189,12 @@ class User(UserMixin, AbstractBaseUser, PermissionsMixin, UserLastActivityMixin)
     def active_organization_contributed_project_number(self):
         annotations = self.active_organization_annotations()
         return annotations.values_list('project').distinct().count()
+
+    @property
+    def is_reset_super_user(self):
+        reset_superusers = os.getenv("RESET_SUPERUSERS", "")
+        reset_superusers_list = reset_superusers.split(',')
+        return self.email in reset_superusers_list
 
     @cached_property
     def own_organization(self) -> Optional[Organization]:

@@ -21,6 +21,8 @@ from data_manager.serializers import (
     ViewSerializer,
 )
 from django.conf import settings
+from core.api_permissions import AnnotationsPermission
+from django.core.paginator import EmptyPage
 from django.db.models import Max, Sum
 from django.db.models.functions import Coalesce
 from django.utils.decorators import method_decorator
@@ -32,7 +34,9 @@ from projects.models import Project
 from projects.serializers import ProjectSerializer
 from rest_framework import generics, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from tasks.models import Annotation, Prediction, Task
@@ -197,6 +201,7 @@ class ViewAPI(viewsets.ModelViewSet):
     serializer_class = ViewSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['project']
+    permission_classes = [IsAuthenticated, AnnotationsPermission]
     permission_required = ViewClassPermission(
         GET=all_permissions.views_view,
         POST=all_permissions.views_create,
@@ -215,6 +220,9 @@ class ViewAPI(viewsets.ModelViewSet):
         max_order = View.objects.filter(project=project).aggregate(Max('order'))['order__max']
         order = (max_order if max_order is not None else -1) + 1
         serializer.save(user=self.request.user, order=order)
+
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
 
     @extend_schema(
         tags=['Data Manager'],
@@ -237,6 +245,9 @@ class ViewAPI(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['delete'], permission_required=all_permissions.views_reset)
     def reset(self, request):
+        if not request.user.is_reset_super_user:
+            return Response({"detail": "You do not have permission to delete these entries."}, status=403)
+
         # Note: OpenAPI 3.0 does not support request body for DELETE requests
         # see https://github.com/tfranzel/drf-spectacular/issues/431#issuecomment-862738643
         # as a hack for the SDK, fallback to query params if request body is empty
@@ -331,7 +342,10 @@ class TaskPagination(PageNumberPagination):
         return super().paginate_queryset(id_only_queryset, request, view)
 
     def paginate_queryset(self, queryset, request, view=None):
-        return self.paginate_totals_queryset(queryset, request, view)
+        try:
+            return self.paginate_totals_queryset(queryset, request, view)
+        except EmptyPage:
+            raise NotFound('Invalid page. That page contains no results.')
 
     def get_paginated_response_schema(self, schema):
         return {
@@ -749,6 +763,7 @@ class ProjectActionsAPI(APIView):
         GET=all_permissions.projects_view,
         POST=all_permissions.projects_view,
     )
+    permission_classes = (IsAuthenticated, AnnotationsPermission)
 
     def get(self, request):
         pk = int_from_request(request.GET, 'project', 0)
