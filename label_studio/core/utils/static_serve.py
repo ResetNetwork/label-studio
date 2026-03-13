@@ -68,6 +68,9 @@ def serve(request, path, document_root=None, show_indexes=False, manifest_asset_
 
     response = RangedFileResponse(request, fullpath.open('rb'), content_type=content_type)
     response['Last-Modified'] = http_date(statobj.st_mtime)
+    # These assets are served with cache-busting query strings in templates (e.g. `?v=<commit>`),
+    # so allowing long-lived caching significantly improves perceived load time behind proxies.
+    response['Cache-Control'] = 'public, max-age=31536000, immutable'
     if encoding:
         response['Content-Encoding'] = encoding
     return response
