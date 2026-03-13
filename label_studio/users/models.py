@@ -21,9 +21,6 @@ from rest_framework.authtoken.models import Token
 from users.functions import hash_upload
 from users.functions.last_activity import get_user_last_activity, schedule_activity_sync, set_user_last_activity
 
-from dotenv import load_dotenv
-load_dotenv()
-
 YEAR_START = 1980
 YEAR_CHOICES = []
 for r in range(YEAR_START, (datetime.datetime.now().year + 1)):
