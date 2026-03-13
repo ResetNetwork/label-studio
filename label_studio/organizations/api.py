@@ -32,13 +32,16 @@ from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 from tasks.models import Annotation
 from users.models import User
+from django.contrib.auth import get_user_model
 
 from label_studio.core.permissions import ViewClassPermission, all_permissions
+from label_studio.core.api_permissions import SuperUserInvitePermission
 from label_studio.core.utils.params import bool_from_request
 
 logger = logging.getLogger(__name__)
 
 HasObjectPermission = load_func(settings.MEMBER_PERM)
+User = get_user_model()
 
 
 @method_decorator(
@@ -363,6 +366,22 @@ class OrganizationAPI(generics.RetrieveUpdateAPIView):
     def put(self, request, *args, **kwargs):
         return super(OrganizationAPI, self).put(request, *args, **kwargs)
 
+    def get_queryset(self):
+        """Filter queryset to only show organizations user is member of"""
+        return Organization.objects.filter(
+            organizationmember__user=self.request.user,
+            organizationmember__deleted_at__isnull=True
+        )
+
+    def perform_update(self, serializer):
+        """Additional validation before update"""
+        instance = serializer.instance
+        if instance != self.request.user.active_organization:
+            raise PermissionDenied(
+                'You can only update settings for your current active organization'
+            )
+        serializer.save()
+
 
 @method_decorator(
     name='get',
@@ -381,7 +400,9 @@ class OrganizationAPI(generics.RetrieveUpdateAPIView):
 class OrganizationInviteAPI(generics.RetrieveAPIView):
     parser_classes = (JSONParser,)
     queryset = Organization.objects.all()
+    # Require invite permission and enforce superuser invite check
     permission_required = all_permissions.organizations_invite
+    permission_classes = (IsAuthenticated, SuperUserInvitePermission)
 
     def get(self, request, *args, **kwargs):
         org = request.user.active_organization
@@ -419,3 +440,47 @@ class OrganizationResetTokenAPI(APIView):
         serializer = OrganizationInviteSerializer(data={'invite_url': invite_url, 'token': org.token})
         serializer.is_valid()
         return Response(serializer.data, status=201)
+
+
+@method_decorator(
+    name='post',
+    decorator=extend_schema(
+        tags=['Organizations'],
+        summary='Set active organization',
+        description='Set the active organization for the current user.',
+        request={
+            'application/json': {
+                'type': 'object',
+                'required': ['organization_id'],
+                'properties': {'organization_id': {'type': 'integer'}},
+            }
+        },
+        responses={
+            200: OpenApiResponse(description='Success'),
+            403: OpenApiResponse(description='Permission denied'),
+            404: OpenApiResponse(description='Organization not found'),
+        },
+    ),
+)
+class ActiveOrganizationAPI(APIView):
+    permission_classes = (IsAuthenticated,)
+    parser_classes = (JSONParser,)
+
+    def post(self, request, *args, **kwargs):
+        organization_id = request.data.get('organization_id')
+        
+        # Use filter().first() instead of get() to handle potential duplicates
+        organization = Organization.objects.filter(
+            id=organization_id,
+            organizationmember__user=request.user,
+            organizationmember__deleted_at__isnull=True
+        ).distinct().first()
+        
+        if not organization:
+            raise NotFound('Organization not found or user is not a member')
+
+        # Update user's active organization
+        request.user.active_organization = organization
+        request.user.save(update_fields=['active_organization'])
+
+        return Response({'detail': 'Active organization updated successfully'}, status=200)
