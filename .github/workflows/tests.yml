@@ -42,6 +42,7 @@ jobs:
     env:
       SENTRY_ENVIRONMENT: tests-ubuntu-sqlite
       DJANGO_DB: sqlite
+      SENTRY_DSN: ""
 
     steps:
       - uses: hmarr/debug-action@v3.0.0
