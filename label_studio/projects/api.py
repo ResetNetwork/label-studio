@@ -3,6 +3,7 @@
 import logging
 import os
 import pathlib
+from datetime import datetime, timedelta
 
 from core.feature_flags import flag_set
 from core.filters import NumberInFilter
@@ -23,15 +24,18 @@ from django.http import Http404
 from django.utils.decorators import method_decorator
 from django_filters import CharFilter, FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Case, FloatField, Value, When
+from django.db.models.functions import Cast
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from label_studio_sdk.label_interface.interface import LabelInterface
 from ml.serializers import MLBackendSerializer
+from projects.functions import annotate_finished_task_number, annotate_weekly_annotation_count
 from projects.functions.next_task import get_next_task
 from projects.functions.search import search_projects
 from projects.functions.stream_history import get_label_stream_history
 from projects.functions.utils import recalculate_created_annotations_and_labels_from_scratch
-from projects.models import Project, ProjectImport, ProjectManager, ProjectReimport, ProjectSummary
+from projects.models import Project, ProjectImport, ProjectManager, ProjectReimport, ProjectSummary, ProjectMember
 from projects.serializers import (
     GetFieldsSerializer,
     ProjectCountsSerializer,
@@ -48,7 +52,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.exceptions import ValidationError as RestValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.views import exception_handler
@@ -63,6 +67,13 @@ from users.models import User
 from users.serializers import UserSimpleSerializer
 from webhooks.models import WebhookAction
 from webhooks.utils import api_webhook, api_webhook_for_delete, emit_webhooks_for_instance
+from django.utils import timezone
+from django.db.models import Avg, Count, DurationField, ExpressionWrapper, Q, Sum
+from django.db.models.functions import TruncDate
+from rest_framework.exceptions import APIException
+from core.redis import redis_connected
+from django.core.cache import cache
+from typing import Dict, Union, List
 
 from label_studio.core.utils.common import load_func
 
@@ -168,16 +179,35 @@ class ProjectListAPI(generics.ListCreateAPIView):
         fields = self.get_requested_fields(serializer)
         sparse_fields = self.get_sparse_fields()
         filter = serializer.validated_data.get('filter')
-        projects = Project.objects.filter(organization=self.request.user.active_organization).order_by(
-            F('pinned_at').desc(nulls_last=True), '-created_at'
+        ids = self.request.query_params.get('ids')
+        requested_fields = set(fields or [])
+        include_counter_fields = bool(requested_fields and any(f in ProjectManager.ANNOTATED_FIELDS for f in requested_fields))
+        
+        # Base queryset with annotations
+        queryset = Project.objects.filter(
+            organization=self.request.user.active_organization,
+            members__user=self.request.user,
         )
         search = serializer.validated_data.get('search')
         if search:
-            projects = search_projects(projects, search)
+            queryset = search_projects(queryset, search)
+
+        # When the frontend requests per-project counters for a fixed `ids` list (Projects page),
+        # avoid correlated subqueries per project. Counters are computed in bulk and injected in the serializer.
+        if not (ids and include_counter_fields):
+            queryset = ProjectManager.with_counts_annotate(queryset, fields=fields)
+            if 'finished_task_number' in requested_fields:
+                queryset = annotate_finished_task_number(queryset)
+            if 'weekly_annotation_count' in requested_fields:
+                queryset = annotate_weekly_annotation_count(queryset)
+
+        queryset = queryset.order_by(
+            F('pinned_at').desc(nulls_last=True),
+            '-created_at',
+        )
+
         if filter in ['pinned_only', 'exclude_pinned']:
-            projects = projects.filter(pinned_at__isnull=filter == 'exclude_pinned')
-        if fields is None or set(fields) & set(ProjectManager.COUNTER_FIELDS):
-            projects = ProjectManager.with_counts_annotate(projects, fields=fields)
+            queryset = queryset.filter(pinned_at__isnull=filter == 'exclude_pinned')
 
         # Only annotate FSM state for UI/API consumption when both feature flags are enabled
         state_requested = (
@@ -191,14 +221,14 @@ class ProjectListAPI(generics.ListCreateAPIView):
             and flag_set('fflag_feat_fit_568_finite_state_management', user=self.request.user)
             and flag_set('fflag_feat_fit_710_fsm_state_fields', user=self.request.user)
         ):
-            projects = projects.with_state()
+            queryset = queryset.with_state()
 
         prefetch_fields = []
         if sparse_fields is None or 'members' in sparse_fields:
             prefetch_fields.append('members')
         if sparse_fields is None or 'created_by' in sparse_fields:
             prefetch_fields.append('created_by')
-        return projects.prefetch_related(*prefetch_fields) if prefetch_fields else projects
+        return queryset.prefetch_related(*prefetch_fields) if prefetch_fields else queryset
 
     def get_serializer(self, *args, **kwargs):
         sparse_fields = self.get_sparse_fields()
@@ -210,11 +240,128 @@ class ProjectListAPI(generics.ListCreateAPIView):
     def get_serializer_context(self):
         context = super(ProjectListAPI, self).get_serializer_context()
         context['created_by'] = self.request.user
+
+        ids = self.request.query_params.get('ids')
+        include = self.request.query_params.get('include') or ''
+        requested_fields = {f.strip() for f in include.split(',') if f.strip()}
+
+        requested_counters = {
+            field for field in requested_fields if field in ProjectManager.ANNOTATED_FIELDS or field == 'weekly_annotation_count'
+        }
+
+        if ids and requested_counters:
+            try:
+                project_ids = [int(x) for x in ids.split(',') if x]
+            except ValueError:
+                project_ids = []
+
+            if project_ids:
+                context['project_counters'] = self._bulk_project_counters(project_ids, requested_counters)
+
         return context
+
+    def _bulk_project_counters(self, project_ids: List[int], requested: set[str]) -> Dict[int, Dict[str, int]]:
+        """Compute project counters in bulk for a bounded list of project IDs.
+
+        This avoids per-project correlated subqueries which can be very slow on large task/annotation tables.
+        """
+        counters: Dict[int, Dict[str, int]] = {project_id: {} for project_id in project_ids}
+
+        def assign(results, field_name: str):
+            for row in results:
+                pid = row['project_id']
+                if pid in counters:
+                    counters[pid][field_name] = int(row['count'])
+
+        if 'task_number' in requested:
+            assign(
+                Task.objects.filter(project_id__in=project_ids)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'task_number',
+            )
+
+        if 'finished_task_number' in requested:
+            assign(
+                Task.objects.filter(project_id__in=project_ids, is_labeled=True)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'finished_task_number',
+            )
+
+        if 'total_predictions_number' in requested:
+            from tasks.models import Prediction
+
+            assign(
+                Prediction.objects.filter(project_id__in=project_ids)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'total_predictions_number',
+            )
+
+        if 'total_annotations_number' in requested:
+            assign(
+                Annotation.objects.filter(project_id__in=project_ids, was_cancelled=False)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'total_annotations_number',
+            )
+
+        if 'useful_annotation_number' in requested:
+            assign(
+                Annotation.objects.filter(
+                    project_id__in=project_ids, was_cancelled=False, ground_truth=False, result__isnull=False
+                )
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'useful_annotation_number',
+            )
+
+        if 'ground_truth_number' in requested:
+            assign(
+                Annotation.objects.filter(project_id__in=project_ids, ground_truth=True)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'ground_truth_number',
+            )
+
+        if 'skipped_annotations_number' in requested:
+            assign(
+                Annotation.objects.filter(project_id__in=project_ids, was_cancelled=True)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'skipped_annotations_number',
+            )
+
+        if 'num_tasks_with_annotations' in requested:
+            assign(
+                Annotation.objects.filter(
+                    project_id__in=project_ids, ground_truth=False, was_cancelled=False, result__isnull=False
+                )
+                .values('project_id')
+                .annotate(count=Count('task_id', distinct=True)),
+                'num_tasks_with_annotations',
+            )
+
+        if 'weekly_annotation_count' in requested:
+            one_week_ago = timezone.now() - timedelta(days=7)
+            assign(
+                Annotation.objects.filter(project_id__in=project_ids, created_at__gte=one_week_ago, was_cancelled=False)
+                .values('project_id')
+                .annotate(count=Count('id')),
+                'weekly_annotation_count',
+            )
+
+        return counters
 
     def perform_create(self, ser):
         try:
-            ser.save(organization=self.request.user.active_organization)
+            project = ser.save(organization=self.request.user.active_organization)
+            # Add creator as a project member
+            ProjectMember.objects.create(
+                user=self.request.user,
+                project=project
+            )
         except IntegrityError as e:
             if str(e) == 'UNIQUE constraint failed: project.title, project.created_by_id':
                 raise ProjectExistException(
@@ -394,7 +541,7 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
         projects = Project.objects.with_counts(fields=fields).filter(
-            organization=self.request.user.active_organization
+            organization=self.request.user.active_organization, members__user=self.request.user
         )
 
         # Only annotate FSM state for UI/API consumption when both feature flags are enabled
@@ -946,3 +1093,170 @@ class ProjectAnnotatorsAPI(generics.RetrieveAPIView):
         users = User.objects.filter(id__in=annotator_ids).prefetch_related('om_through').order_by('id')
         data = UserSimpleSerializer(users, many=True, context={'request': request}).data
         return Response(data)
+
+@extend_schema(
+    tags=['Users'],
+    summary='Get user metrics',
+    description=(
+        "Get metrics about the current user's annotation activity. "
+        "Returns daily/weekly/quarterly counts, trimmed mean annotation time, regularity, "
+        "projects contributed, and total time spent annotating this week."
+    ),
+    responses={
+        200: OpenApiResponse(
+            description='User metrics',
+            response={
+                'type': 'object',
+                'properties': {
+                    'annotations_today': {'type': 'integer'},
+                    'annotations_week': {'type': 'integer'},
+                    'annotations_quarter': {'type': 'integer'},
+                    'avg_annotation_time': {'type': 'number'},
+                    'regularity': {'type': 'integer'},
+                    'projects_contributed': {'type': 'integer'},
+                    'total_time_week': {'type': 'number'},
+                },
+            },
+        ),
+    },
+)
+class UserMetricsAPI(generics.RetrieveAPIView):
+    """API endpoint for retrieving user annotation metrics.
+    
+    This endpoint provides various statistics about a user's annotation activity,
+    including daily, weekly, and quarterly counts, average annotation time, and
+    a regularity score.
+    
+    The metrics are cached for 5 minutes to improve performance.
+    """
+    permission_required = ViewClassPermission(GET=all_permissions.tasks_view)
+    parser_classes = (JSONParser,)
+    queryset = Annotation.objects.all()
+    CACHE_TTL = 300  # 5 minutes
+
+    def _get_cache_key(self, user_id: int, org_id: int) -> str:
+        """Generate a cache key for user metrics"""
+        return f'user_metrics:{user_id}:{org_id}'
+
+    def get_queryset(self):
+        """Get base queryset for annotations"""
+        return Annotation.objects.filter(
+            was_cancelled=False,
+            project__organization=self.request.user.active_organization
+        )
+
+    def _calculate_metrics(self, user_id: int, org_id: int) -> Dict[str, Union[int, float]]:
+        """Calculate user metrics with optimized database queries"""
+        try:
+            now = timezone.now()
+            start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            week_ago = now - timedelta(days=7)
+
+            # Base queryset with organization scope
+            annotations = self.get_queryset().filter(completed_by_id=user_id)
+
+            # Get all counts in one query
+            counts = annotations.aggregate(
+                today=Count('id', filter=Q(created_at__gte=start_of_today)),
+                week=Count('id', filter=Q(created_at__gte=week_ago)),
+                quarter=Count('id', filter=Q(created_at__gte=now - timedelta(days=90))),
+                projects_contributed=Count('project_id', distinct=True),
+                total_time_week=Sum(
+                    'lead_time',
+                    filter=Q(created_at__gte=week_ago)
+                )
+            )
+            
+            # Calculate average time using lead_time
+            lead_times = annotations.filter(
+                created_at__gte=now - timedelta(days=90),
+                lead_time__isnull=False
+            ).values_list('lead_time', flat=True)
+            
+            avg_time = self._calculate_trimmed_mean(lead_times)
+
+            # Calculate regularity
+            days_with_annotations = annotations.filter(
+                created_at__gte=now - timedelta(days=10)
+            ).annotate(
+                date=TruncDate('created_at')
+            ).values('date').annotate(
+                count=Count('id')
+            ).filter(count__gte=3).count()
+            
+            # Convert total_time_week from seconds to hours
+            total_hours = 0
+            if counts['total_time_week']:
+                total_hours = round(counts['total_time_week'] / 3600, 1)
+
+            metrics = {
+                'annotations_today': counts['today'],
+                'annotations_week': counts['week'],
+                'annotations_quarter': counts['quarter'],
+                'total_time_week': total_hours,
+                'avg_annotation_time': avg_time,
+                'regularity': int((days_with_annotations / 10) * 100),
+                'projects_contributed': counts['projects_contributed'],
+            }
+
+            # Cache the results
+            cache_key = self._get_cache_key(user_id, org_id)
+            cache.set(cache_key, metrics, self.CACHE_TTL)
+
+            return metrics
+
+        except Exception as e:
+            logger.error(f"Error calculating metrics for user {user_id}: {str(e)}", exc_info=True)
+            raise APIException("Failed to calculate metrics")
+
+    def _calculate_trimmed_mean(self, lead_times: List[float]) -> float:
+        """Calculate trimmed mean of lead times, excluding top/bottom 10%
+        
+        Args:
+            lead_times: List of lead times in seconds
+            
+        Returns:
+            float: The trimmed mean in seconds, or 0 if no valid times
+        """
+        if not lead_times:
+            return 0
+        
+        # Filter invalid and sort
+        seconds = sorted(
+            t for t in lead_times 
+            if t and t > 0
+        )
+        
+        if not seconds:
+            return 0
+
+        # Remove top/bottom 10%
+        cutoff = int(len(seconds) * 0.1)
+        if cutoff > 0:
+            trimmed = seconds[cutoff:-cutoff]
+        else:
+            trimmed = seconds
+
+        return round(sum(trimmed) / len(trimmed), 1) if trimmed else 0
+
+    def get_object(self):
+        """Get user metrics, using cache if available"""
+        user = self.request.user
+        cache_key = self._get_cache_key(user.id, user.active_organization_id)
+        
+        # Try to get from cache first
+        metrics = cache.get(cache_key)
+        if metrics is not None:
+            return metrics
+
+        # Calculate if not in cache
+        return self._calculate_metrics(user.id, user.active_organization_id)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Override retrieve to add performance monitoring"""
+        try:
+            metrics = self.get_object()
+            return Response(metrics)
+        except Exception as e:
+            logger.error(f"Error retrieving metrics: {str(e)}", exc_info=True)
+            raise APIException("Failed to retrieve metrics")
