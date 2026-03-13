@@ -21,7 +21,7 @@ export const OrgSwitcher: FC = () => {
   const fetchOrganizations = useCallback(async () => {
     try {
       const response = await callApi<OrganizationsResponse>("userOrganizations");
-      
+
       if (response?.organizations) {
         setOrganizations(response.organizations);
       }
@@ -36,7 +36,7 @@ export const OrgSwitcher: FC = () => {
           organization_id: orgId
         }
       });
-      
+
       await fetchOrganizations();
       window.location.reload();
     } catch (error: unknown) {
@@ -77,4 +77,4 @@ export const OrgSwitcher: FC = () => {
       </ul>
     </div>
   );
-}; 
+};

@@ -63,7 +63,7 @@ def annotate_weekly_annotation_count(queryset):
     """Returns number of annotations created in the last 7 days"""
     one_week_ago = timezone.now() - timedelta(days=7)
     annotations = Annotation.objects.filter(
-        Q(project=OuterRef('id')) & 
+        Q(project=OuterRef('id')) &
         Q(created_at__gte=one_week_ago) &
         Q(was_cancelled=False)
     ).values('id')

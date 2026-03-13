@@ -25,4 +25,4 @@ export const formatDuration = (seconds) => {
   }
 
   return parts.join(' ') || '0s';
-}; 
+};

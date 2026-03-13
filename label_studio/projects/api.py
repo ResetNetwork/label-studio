@@ -182,7 +182,7 @@ class ProjectListAPI(generics.ListCreateAPIView):
         ids = self.request.query_params.get('ids')
         requested_fields = set(fields or [])
         include_counter_fields = bool(requested_fields and any(f in ProjectManager.ANNOTATED_FIELDS for f in requested_fields))
-        
+
         # Base queryset with annotations
         queryset = Project.objects.filter(
             organization=self.request.user.active_organization,
@@ -769,13 +769,13 @@ class ProjectSummaryResetAPI(GetParentObjectMixin, generics.CreateAPIView):
         summary='Get project import status ',
         description="""
             Poll the status of an asynchronous project import operation.
-            
+
             **Usage:**
             1. When you POST to `/api/projects/{project_id}/import`, you'll receive a response like `{"import": <import_id>}`
             2. Use that `import_id` with this GET endpoint to check the import status
             3. Poll this endpoint to see if the import has completed, is still processing, or has failed
             4. **Import errors and failures will only be visible in this GET response**, not in the original POST request
-            
+
             This endpoint returns detailed information about the import including task counts, status, and any error messages.
         """,
         parameters=[
@@ -809,13 +809,13 @@ class ProjectImportAPI(generics.RetrieveAPIView):
         summary='Get project reimport status',
         description="""
             Poll the status of an asynchronous project reimport operation.
-            
+
             **Usage:**
             1. When you POST to reimport tasks, you'll receive a response with a reimport ID
             2. Use that `reimport_id` with this GET endpoint to check the reimport status
             3. Poll this endpoint to see if the reimport has completed, is still processing, or has failed
             4. **Reimport errors and failures will only be visible in this GET response**, not in the original POST request
-            
+
             This endpoint returns detailed information about the reimport including task counts, status, and any error messages.
         """,
         parameters=[
@@ -1122,11 +1122,11 @@ class ProjectAnnotatorsAPI(generics.RetrieveAPIView):
 )
 class UserMetricsAPI(generics.RetrieveAPIView):
     """API endpoint for retrieving user annotation metrics.
-    
+
     This endpoint provides various statistics about a user's annotation activity,
     including daily, weekly, and quarterly counts, average annotation time, and
     a regularity score.
-    
+
     The metrics are cached for 5 minutes to improve performance.
     """
     permission_required = ViewClassPermission(GET=all_permissions.tasks_view)
@@ -1166,13 +1166,13 @@ class UserMetricsAPI(generics.RetrieveAPIView):
                     filter=Q(created_at__gte=week_ago)
                 )
             )
-            
+
             # Calculate average time using lead_time
             lead_times = annotations.filter(
                 created_at__gte=now - timedelta(days=90),
                 lead_time__isnull=False
             ).values_list('lead_time', flat=True)
-            
+
             avg_time = self._calculate_trimmed_mean(lead_times)
 
             # Calculate regularity
@@ -1183,7 +1183,7 @@ class UserMetricsAPI(generics.RetrieveAPIView):
             ).values('date').annotate(
                 count=Count('id')
             ).filter(count__gte=3).count()
-            
+
             # Convert total_time_week from seconds to hours
             total_hours = 0
             if counts['total_time_week']:
@@ -1211,22 +1211,22 @@ class UserMetricsAPI(generics.RetrieveAPIView):
 
     def _calculate_trimmed_mean(self, lead_times: List[float]) -> float:
         """Calculate trimmed mean of lead times, excluding top/bottom 10%
-        
+
         Args:
             lead_times: List of lead times in seconds
-            
+
         Returns:
             float: The trimmed mean in seconds, or 0 if no valid times
         """
         if not lead_times:
             return 0
-        
+
         # Filter invalid and sort
         seconds = sorted(
-            t for t in lead_times 
+            t for t in lead_times
             if t and t > 0
         )
-        
+
         if not seconds:
             return 0
 
@@ -1243,7 +1243,7 @@ class UserMetricsAPI(generics.RetrieveAPIView):
         """Get user metrics, using cache if available"""
         user = self.request.user
         cache_key = self._get_cache_key(user.id, user.active_organization_id)
-        
+
         # Try to get from cache first
         metrics = cache.get(cache_key)
         if metrics is not None:
