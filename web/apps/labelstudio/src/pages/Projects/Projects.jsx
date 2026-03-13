@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams as useRouterParams } from "react-router";
 import { Redirect } from "react-router-dom";
-import { Button } from "@humansignal/ui";
+import { Button, Dropdown, Space, Typography } from "@humansignal/ui";
 import { Oneof } from "../../components/Oneof/Oneof";
 import { Spinner } from "../../components/Spinner/Spinner";
 import { ApiContext } from "../../providers/ApiProvider";
@@ -13,12 +13,23 @@ import { SettingsPage } from "../Settings";
 import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
 import { useAbortController, useUpdatePageTitle } from "@humansignal/core";
 import "./Projects.scss";
+import { OrgSwitcher } from "../../components/OrgSwitcher/OrgSwitcher";
+import { UserStatsCard } from "../../components/UserStatsCard/UserStatsCard";
+import { Menu } from "../../components";
 
 const getCurrentPage = () => {
   const pageNumberFromURL = new URLSearchParams(location.search).get("page");
 
   return pageNumberFromURL ? Number.parseInt(pageNumberFromURL) : 1;
 };
+
+const SORT_OPTIONS = [
+  { key: "completion_asc", label: "Least complete" },
+  { key: "completion_desc", label: "Most complete" },
+  { key: "weekly_desc", label: "Most active (week)" },
+  { key: "created_desc", label: "Recently created" },
+  { key: "title_asc", label: "Title (A→Z)" },
+];
 
 export const ProjectsPage = () => {
   const api = React.useContext(ApiContext);
@@ -33,6 +44,10 @@ export const ProjectsPage = () => {
   const defaultPageSize = Number.parseInt(localStorage.getItem("pages:projects-list") ?? 30);
 
   const [modal, setModal] = React.useState(false);
+  const [query, setQuery] = useState("");
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [activeOnly, setActiveOnly] = useState(true); // Hide 100% complete by default
+  const [sortKey, setSortKey] = useState(SORT_OPTIONS[0].key);
 
   const openModal = () => setModal(true);
 
@@ -53,6 +68,7 @@ export const ProjectsPage = () => {
       "is_published",
       "assignment_settings",
       "state",
+      "pinned_at",
     ].join(",");
 
     const data = await api.callApi("projects", {
@@ -79,6 +95,8 @@ export const ProjectsPage = () => {
             "total_predictions_number",
             "ground_truth_number",
             "finished_task_number",
+            "weekly_annotation_count",
+            "pinned_at",
           ].join(","),
           page_size: pageSize,
         },
@@ -116,6 +134,72 @@ export const ProjectsPage = () => {
     setContextProps({ openModal, showButton: projectsList.length > 0 });
   }, [projectsList.length]);
 
+  const visibleProjects = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    let results = projectsList;
+    if (pinnedOnly) {
+      results = results.filter((p) => Boolean(p.pinned_at));
+    }
+
+    if (activeOnly) {
+      results = results.filter((p) => {
+        const tasks = p.task_number ?? 0;
+        const done = p.finished_task_number ?? 0;
+        return tasks > 0 && done < tasks; // Show only if has tasks AND not 100% complete
+      });
+    }
+
+    if (q) {
+      results = results.filter((p) => {
+        const title = (p.title ?? "").toLowerCase();
+        const description = (p.description ?? "").toLowerCase();
+        return title.includes(q) || description.includes(q);
+      });
+    }
+
+    const sortFn = (a, b) => {
+      const taskA = a.task_number ?? 0;
+      const taskB = b.task_number ?? 0;
+      const doneA = a.finished_task_number ?? 0;
+      const doneB = b.finished_task_number ?? 0;
+
+      const completionA = taskA > 0 ? doneA / taskA : 0;
+      const completionB = taskB > 0 ? doneB / taskB : 0;
+
+      switch (sortKey) {
+        case "completion_desc":
+          return completionB - completionA;
+        case "weekly_desc":
+          return (b.weekly_annotation_count ?? 0) - (a.weekly_annotation_count ?? 0);
+        case "created_desc":
+          return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+        case "title_asc":
+          return (a.title ?? "").localeCompare(b.title ?? "");
+        case "completion_asc":
+        default:
+          return completionA - completionB;
+      }
+    };
+
+    return [...results].sort(sortFn);
+  }, [projectsList, pinnedOnly, activeOnly, query, sortKey]);
+
+  const kpis = useMemo(() => {
+    const taskTotal = visibleProjects.reduce((sum, p) => sum + (p.task_number ?? 0), 0);
+    const taskDone = visibleProjects.reduce((sum, p) => sum + (p.finished_task_number ?? 0), 0);
+    const weekly = visibleProjects.reduce((sum, p) => sum + (p.weekly_annotation_count ?? 0), 0);
+    const completion = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 100) : 0;
+
+    return [
+      { label: "Showing", value: visibleProjects.length + "/" + totalItems },
+      { label: "Tasks", value: taskTotal.toLocaleString() },
+      { label: "Done", value: taskDone.toLocaleString() },
+      { label: "Week", value: "+" + weekly.toLocaleString() },
+      { label: "Progress", value: completion + "%" },
+    ];
+  }, [totalItems, visibleProjects]);
+
   return (
     <div className={cn("projects-page").toClassName()}>
       <Oneof value={networkState}>
@@ -123,9 +207,68 @@ export const ProjectsPage = () => {
           <Spinner size={64} />
         </div>
         <div className={cn("projects-page").elem("content").toClassName()} case="loaded">
-          {projectsList.length ? (
+          <div className={cn("projects-page").elem("header").toClassName()}>
+            <div className={cn("projects-page").elem("org").toClassName()}>
+              <OrgSwitcher />
+            </div>
+
+            <div className={cn("projects-page").elem("toolbar").toClassName()}>
+              <div className={cn("projects-page").elem("search").toClassName()}>
+                <input
+                  id="projects-search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className={cn("projects-page").elem("search-input").toClassName()}
+                  placeholder="Search projects…"
+                />
+              </div>
+
+              <Space>
+                <Button
+                  look={activeOnly ? "primary" : "outlined"}
+                  size="small"
+                  onClick={() => setActiveOnly((prev) => !prev)}
+                  aria-pressed={activeOnly}
+                  aria-label="Toggle active projects only"
+                >
+                  {activeOnly ? "Active" : "All"}
+                </Button>
+
+                <Button
+                  look={pinnedOnly ? "primary" : "outlined"}
+                  size="small"
+                  onClick={() => setPinnedOnly((prev) => !prev)}
+                  aria-pressed={pinnedOnly}
+                  aria-label="Toggle pinned projects only"
+                >
+                  Pinned
+                </Button>
+
+                <Dropdown.Trigger
+                  content={
+                    <Menu contextual>
+                      {SORT_OPTIONS.map((opt) => (
+                        <Menu.Item key={opt.key} onClick={() => setSortKey(opt.key)} active={opt.key === sortKey}>
+                          {opt.label}
+                        </Menu.Item>
+                      ))}
+                    </Menu>
+                  }
+                >
+                  <Button look="outlined" size="small" aria-label="Sort projects">
+                    {SORT_OPTIONS.find((o) => o.key === sortKey)?.label ?? "Sort"}
+                  </Button>
+                </Dropdown.Trigger>
+              </Space>
+            </div>
+
+            <div className={cn("projects-page").elem("stats").toClassName()}>
+              <UserStatsCard projectKpis={kpis} />
+            </div>
+          </div>
+          {visibleProjects.length ? (
             <ProjectsList
-              projects={projectsList}
+              projects={visibleProjects}
               currentPage={currentPage}
               totalItems={totalItems}
               loadNextPage={loadNextPage}
@@ -152,7 +295,7 @@ ProjectsPage.routes = ({ store }) => [
     component: () => {
       const params = useRouterParams();
 
-      return <Redirect to={`/projects/${params.id}/data`} />;
+      return <Redirect to={"/projects/" + params.id + "/data"} />;
     },
     pages: {
       DataManagerPage,

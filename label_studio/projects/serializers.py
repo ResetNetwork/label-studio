@@ -110,6 +110,7 @@ class ProjectSerializer(FlexFieldsModelSerializer):
         default=None, read_only=True, help_text='Flag to detect is project ready for bulk annotation'
     )
     finished_task_number = serializers.IntegerField(default=None, read_only=True, help_text='Finished tasks')
+    weekly_annotation_count = serializers.IntegerField(default=None, read_only=True, help_text='Weekly annotation count')
 
     queue_total = serializers.SerializerMethodField()
     queue_done = serializers.SerializerMethodField()
@@ -180,6 +181,21 @@ class ProjectSerializer(FlexFieldsModelSerializer):
 
         # If all checks pass, return True
         return True
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        counters = self.context.get('project_counters')
+        if not counters:
+            return data
+
+        project_values = counters.get(getattr(instance, 'id', None))
+        if not project_values:
+            return data
+
+        for key, value in project_values.items():
+            if key in data:
+                data[key] = value
+        return data
 
     @staticmethod
     def get_parsed_label_config(project):
@@ -268,6 +284,7 @@ class ProjectSerializer(FlexFieldsModelSerializer):
             'queue_done',
             'config_suitable_for_bulk_annotation',
             'state',
+            'weekly_annotation_count',
         ]
 
     def validate_label_config(self, value):
