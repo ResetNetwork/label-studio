@@ -81,7 +81,7 @@ export const UserStatsCard = ({ projectKpis = [] }) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await callApi('userMetrics', {
         handleError: false,
       });
@@ -101,7 +101,7 @@ export const UserStatsCard = ({ projectKpis = [] }) => {
         'projects_contributed',
         'total_time_week'
       ];
-      
+
       const missingFields = requiredFields.filter(field => !(field in response));
       if (missingFields.length > 0) {
         throw new Error(`Missing required metrics: ${missingFields.join(', ')}`);
@@ -110,7 +110,7 @@ export const UserStatsCard = ({ projectKpis = [] }) => {
       setMetrics(response);
     } catch (err) {
       setError(err.message || 'Failed to load metrics');
-      
+
       if (retryCount < 3) {
         const delay = Math.pow(2, retryCount) * 1000;
         setTimeout(() => {
@@ -225,4 +225,4 @@ export const UserStatsCard = ({ projectKpis = [] }) => {
   );
 };
 
-export default UserStatsCard; 
+export default UserStatsCard;

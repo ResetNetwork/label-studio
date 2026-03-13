@@ -468,14 +468,14 @@ class ActiveOrganizationAPI(APIView):
 
     def post(self, request, *args, **kwargs):
         organization_id = request.data.get('organization_id')
-        
+
         # Use filter().first() instead of get() to handle potential duplicates
         organization = Organization.objects.filter(
             id=organization_id,
             organizationmember__user=request.user,
             organizationmember__deleted_at__isnull=True
         ).distinct().first()
-        
+
         if not organization:
             raise NotFound('Organization not found or user is not a member')
 

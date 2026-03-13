@@ -111,7 +111,7 @@ class UserAdminShort(UserAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('bulk-assign/', self.admin_site.admin_view(self.bulk_assign_view), 
+            path('bulk-assign/', self.admin_site.admin_view(self.bulk_assign_view),
                  name='users_user_bulk-assign'),
         ]
         return custom_urls + urls
@@ -122,7 +122,7 @@ class UserAdminShort(UserAdmin):
             if form.is_valid():
                 users = form.cleaned_data['users']
                 projects = form.cleaned_data['projects']
-                
+
                 # Create ProjectMember entries for each user-project combination
                 created_count = 0
                 for user in users:
@@ -134,7 +134,7 @@ class UserAdminShort(UserAdmin):
                         )
                         if created:
                             created_count += 1
-                
+
                 messages.success(request, f'Successfully created {created_count} project memberships')
                 return redirect('..')
         else:
@@ -263,7 +263,7 @@ class ProjectAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('bulk-org-assign/', self.admin_site.admin_view(self.bulk_org_assign_view), 
+            path('bulk-org-assign/', self.admin_site.admin_view(self.bulk_org_assign_view),
                  name='projects_project_bulk-org-assign'),
         ]
         return custom_urls + urls
@@ -274,14 +274,14 @@ class ProjectAdmin(admin.ModelAdmin):
             if form.is_valid():
                 organizations = form.cleaned_data['organizations']
                 projects = form.cleaned_data['projects']
-                
+
                 created_count = 0
                 for project in projects:
                     for org in organizations:
                         # Update project organization
                         project.organization = org
                         project.save()
-                        
+
                         # Add all organization members to the project
                         for member in org.organizationmember_set.filter(deleted_at__isnull=True):
                             _, created = ProjectMember.objects.get_or_create(
@@ -291,8 +291,8 @@ class ProjectAdmin(admin.ModelAdmin):
                             )
                             if created:
                                 created_count += 1
-                
-                messages.success(request, 
+
+                messages.success(request,
                     f'Successfully assigned {len(projects)} projects to {len(organizations)} organizations '
                     f'and created {created_count} project memberships')
                 return redirect('..')

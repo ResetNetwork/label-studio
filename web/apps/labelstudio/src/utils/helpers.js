@@ -35,4 +35,4 @@ export const formatDuration = (seconds) => {
  * formatDuration(3600) => "1h"
  * formatDuration(3661) => "1h 1m"
  * formatDuration(7323) => "2h 2m"
- */ 
+ */

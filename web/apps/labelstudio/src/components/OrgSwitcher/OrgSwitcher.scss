@@ -12,7 +12,7 @@
   width: max-content;
   min-width: 200px;
   flex: 0 0 auto;
-  
+
   &__header {
     padding: 12px 16px;
     border-bottom: 1px solid var(--sand_300);
@@ -44,7 +44,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    
+
     &:hover {
       background: var(--sand_50);
     }
@@ -58,4 +58,4 @@
     font-size: 12px;
     color: var(--sand_600);
   }
-} 
+}
