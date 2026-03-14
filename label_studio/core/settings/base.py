@@ -272,7 +272,6 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
-        'core.api_permissions.SuperUserPermission',
         'core.api_permissions.HasObjectPermission',
         'rest_framework.permissions.IsAuthenticated',
     ],
