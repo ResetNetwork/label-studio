@@ -469,8 +469,12 @@ class TaskAPI(generics.RetrieveUpdateDestroyAPIView):
 
         # First check permissions using a lightweight query
         # select_related('project') avoids extra query when permission check accesses task.project
+        if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
+            lean_queryset = Task.objects.for_user(self.request.user)
+        else:
+            lean_queryset = Task.objects.filter(project__organization=self.request.user.active_organization)
         lean_task = generics.get_object_or_404(
-            Task.objects.filter(project__organization=self.request.user.active_organization).select_related('project'),
+            lean_queryset.select_related('project'),
             pk=task_id,
         )
         self.check_object_permissions(self.request, lean_task)

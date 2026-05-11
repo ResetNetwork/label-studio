@@ -540,9 +540,14 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
         serializer = GetFieldsSerializer(data=self.request.query_params)
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
-        projects = Project.objects.with_counts(fields=fields).filter(
-            organization=self.request.user.active_organization, members__user=self.request.user
-        )
+        if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
+            queryset = Project.objects.for_user(self.request.user)
+        else:
+            queryset = Project.objects.filter(
+                organization=self.request.user.active_organization,
+                members__user=self.request.user,
+            )
+        projects = ProjectManager.with_counts_annotate(queryset, fields=fields)
 
         # Only annotate FSM state for UI/API consumption when both feature flags are enabled
         if flag_set('fflag_feat_fit_568_finite_state_management', user=self.request.user) and flag_set(
@@ -1025,7 +1030,7 @@ class ProjectModelVersions(generics.RetrieveAPIView):
     permission_required = all_permissions.projects_view
 
     def get_queryset(self):
-        return Project.objects.filter(organization=self.request.user.active_organization)
+        return Project.objects.for_user(self.request.user)
 
     def get(self, request, *args, **kwargs):
         project = self.get_object()

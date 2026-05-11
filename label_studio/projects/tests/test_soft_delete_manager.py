@@ -34,28 +34,32 @@ def test_project_manager_filters_deleted():
 
 
 def test_project_manager_for_user_respects_filter():
-    """for_user applies org scope and soft-delete filter.
+    """for_user applies organization membership and soft-delete filter.
 
-    Purpose: Ensure for_user(user) scopes to user's active org and hides deleted rows.
-    Setup: Two orgs; three projects (active+deleted in org1, active in org2).
+    Purpose: Ensure for_user(user) scopes to user's org memberships and hides deleted rows.
+    Setup: Three orgs; active+deleted in org1, active in member org2, active in non-member org3.
     Actions: Call Project.objects.for_user(user) for org1 user.
-    Validations: Only org1 active project is returned.
+    Validations: Active projects from member orgs are returned, regardless of active org.
     Edge cases: N/A.
     """
     org1 = OrganizationFactory()
     org2 = OrganizationFactory()
+    org3 = OrganizationFactory()
     user = org1.created_by
     user.active_organization = org1
     user.save(update_fields=['active_organization'])
+    org2.add_user(user)
 
     p1 = ProjectFactory(organization=org1, title='org1-active')
     _ = ProjectFactory(organization=org1, title='org1-deleted', deleted_at=p1.created_at)
     _ = ProjectFactory(organization=org2, title='org2-active')
+    _ = ProjectFactory(organization=org3, title='org3-active')
 
     titles = set(Project.objects.for_user(user).values_list('title', flat=True))
     assert 'org1-active' in titles
     assert 'org1-deleted' not in titles
-    assert 'org2-active' not in titles
+    assert 'org2-active' in titles
+    assert 'org3-active' not in titles
 
 
 def test_visible_manager_skips_filter_without_column(monkeypatch):

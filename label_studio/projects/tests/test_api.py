@@ -4,6 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlencode
+from organizations.tests.factories import OrganizationFactory
 from projects.api import ProjectListAPI
 from projects.models import ProjectManager, ProjectQuerySetWithFSM
 from projects.tests.factories import ProjectFactory
@@ -200,3 +201,50 @@ class TestProjectModelVersionsAPI(APITestCase):
         assert response.json()['static'][1]['count'] == 1
         assert response.json()['static'][2]['model_version'] == 'model_1'
         assert response.json()['static'][2]['count'] == 2
+
+
+class TestCrossOrganizationProjectAccessAPI(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.active_organization = OrganizationFactory()
+        cls.link_organization = OrganizationFactory()
+        cls.user = cls.active_organization.created_by
+        cls.user.active_organization = cls.active_organization
+        cls.user.save(update_fields=['active_organization'])
+        cls.link_organization.add_user(cls.user)
+        cls.project = ProjectFactory(organization=cls.link_organization)
+
+    def test_project_detail_uses_organization_membership_not_active_organization(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(f'/api/projects/{self.project.id}/')
+
+        assert response.status_code == 200
+        assert response.json()['id'] == self.project.id
+
+    def test_project_list_remains_active_organization_scoped(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get('/api/projects/')
+
+        assert response.status_code == 200
+        assert self.project.id not in {project['id'] for project in response.json()['results']}
+
+    def test_project_update_remains_active_organization_scoped(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.patch(f'/api/projects/{self.project.id}/', data={'title': 'changed'}, format='json')
+
+        assert response.status_code == 404
+        self.project.refresh_from_db()
+        assert self.project.title != 'changed'
+
+    def test_project_update_requires_project_membership_inside_active_organization(self):
+        project = ProjectFactory(organization=self.active_organization)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.patch(f'/api/projects/{project.id}/', data={'title': 'changed'}, format='json')
+
+        assert response.status_code == 404
+        project.refresh_from_db()
+        assert project.title != 'changed'

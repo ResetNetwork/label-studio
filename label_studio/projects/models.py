@@ -111,7 +111,10 @@ class ProjectManager(models.Manager):
         return ProjectQuerySetWithFSM(self.model, using=self._db)
 
     def for_user(self, user):
-        return self.get_queryset().filter(organization=user.active_organization)
+        return self.get_queryset().filter(
+            organization__organizationmember__user=user,
+            organization__organizationmember__deleted_at__isnull=True,
+        ).distinct()
 
     def with_state(self):
         """

@@ -57,6 +57,46 @@ class TestTaskAPI(APITestCase):
             'unresolved_comment_count': 0,
         }
 
+    def test_get_task_uses_organization_membership_not_active_organization(self):
+        active_organization = OrganizationFactory()
+        user = active_organization.created_by
+        user.active_organization = active_organization
+        user.save(update_fields=['active_organization'])
+        self.organization.add_user(user)
+        task = TaskFactory(project=self.project, data={'text': 'linked task'})
+
+        self.client.force_authenticate(user=user)
+        response = self.client.get(f'/api/tasks/{task.id}/')
+
+        assert response.status_code == 200
+        assert response.json()['id'] == task.id
+
+    def test_patch_task_remains_active_organization_scoped(self):
+        active_organization = OrganizationFactory()
+        user = active_organization.created_by
+        user.active_organization = active_organization
+        user.save(update_fields=['active_organization'])
+        self.organization.add_user(user)
+        task = TaskFactory(project=self.project, data={'text': 'linked task'})
+        payload = {
+            'annotations': [],
+            'predictions': [],
+            'data': {'text': 'changed task'},
+            'meta': {},
+            'created_at': '',
+            'updated_at': '',
+            'updated_by': None,
+            'is_labeled': False,
+            'file_upload': None,
+        }
+
+        self.client.force_authenticate(user=user)
+        response = self.client.patch(f'/api/tasks/{task.id}/', data=payload, format='json')
+
+        assert response.status_code == 404
+        task.refresh_from_db()
+        assert task.data == {'text': 'linked task'}
+
     def test_patch_task(self):
         task = TaskFactory(project=self.project, data={'text': 'test'})
 

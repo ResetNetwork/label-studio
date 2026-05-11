@@ -80,10 +80,10 @@ class ProjectMixin:
 
     def has_permission(self, user):
         """
-        Dummy stub for has_permission
+        Check whether the user belongs to this project's organization.
         """
         user.project = self  # link for activity log
-        return True
+        return bool(self.organization and self.organization.has_permission(user))
 
     def _can_use_overlap(self):
         """
