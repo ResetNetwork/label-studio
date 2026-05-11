@@ -7,7 +7,7 @@ import requests_mock
 from django.apps import apps
 from django.urls import reverse
 from projects.models import Project
-from tasks.models import Annotation, Task
+from tasks.models import Annotation, AnnotationDraft, Task
 
 from .utils import _client_is_annotator, invite_client_to_project
 
@@ -122,13 +122,51 @@ def test_create_annotation_with_ground_truth(caplog, any_client, configured_proj
 
 
 @pytest.mark.django_db
-def test_delete_annotation(business_client, configured_project):
+def test_delete_annotation(monkeypatch, business_client, configured_project):
+    monkeypatch.setenv('RESET_SUPERUSERS', business_client.user.email)
     task = Task.objects.first()
     annotation = Annotation.objects.create(task=task, project=configured_project, result=[])
     assert task.annotations.count() == 1
     r = business_client.delete('/api/annotations/{}/'.format(annotation.id))
     assert r.status_code == 204
     assert task.annotations.count() == 0
+
+
+@pytest.mark.django_db
+def test_delete_own_draft_does_not_require_superuser(monkeypatch, business_client, configured_project):
+    monkeypatch.delenv('RESET_SUPERUSERS', raising=False)
+    task = Task.objects.first()
+    draft = AnnotationDraft.objects.create(task=task, user=business_client.user, result=[])
+
+    r = business_client.delete(f'/api/drafts/{draft.id}/')
+
+    assert r.status_code == 204
+    assert not AnnotationDraft.objects.filter(id=draft.id).exists()
+
+
+@pytest.mark.django_db
+def test_delete_other_users_draft_is_forbidden(monkeypatch, business_client, annotator_client, configured_project):
+    monkeypatch.delenv('RESET_SUPERUSERS', raising=False)
+    task = Task.objects.first()
+    configured_project.add_collaborator(annotator_client.user)
+    draft = AnnotationDraft.objects.create(task=task, user=annotator_client.user, result=[])
+
+    r = business_client.delete(f'/api/drafts/{draft.id}/')
+
+    assert r.status_code == 403
+    assert AnnotationDraft.objects.filter(id=draft.id).exists()
+
+
+@pytest.mark.django_db
+def test_delete_annotation_still_requires_superuser(monkeypatch, business_client, configured_project):
+    monkeypatch.delenv('RESET_SUPERUSERS', raising=False)
+    task = Task.objects.first()
+    annotation = Annotation.objects.create(task=task, project=configured_project, result=[])
+
+    r = business_client.delete(f'/api/annotations/{annotation.id}/')
+
+    assert r.status_code == 403
+    assert Annotation.objects.filter(id=annotation.id).exists()
 
 
 @pytest.fixture
@@ -215,7 +253,10 @@ def test_accuracy(
 
 
 @pytest.mark.django_db
-def test_accuracy_on_delete(business_client, annotator_client, project_with_max_annotations_2, annotations):
+def test_accuracy_on_delete(
+    monkeypatch, business_client, annotator_client, project_with_max_annotations_2, annotations
+):
+    monkeypatch.setenv('RESET_SUPERUSERS', business_client.user.email)
     task_id = next(iter(annotations.values()))['task']
     task = Task.objects.get(id=task_id)
     invite_client_to_project(annotator_client, task.project)

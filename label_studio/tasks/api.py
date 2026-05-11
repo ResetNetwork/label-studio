@@ -2,7 +2,7 @@
 
 import logging
 
-from core.api_permissions import AnnotationsPermission
+from core.api_permissions import AnnotationDraftPermission, AnnotationsPermission
 from core.feature_flags import flag_set
 from core.mixins import GetParentObjectMixin
 from core.permissions import ViewClassPermission, all_permissions
@@ -24,8 +24,8 @@ from projects.functions.stream_history import fill_history_annotation
 from projects.models import Project
 from rest_framework import generics, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from tasks.models import Annotation, AnnotationDraft, Prediction, Task
 from tasks.openapi_schema import (
@@ -1236,7 +1236,12 @@ class AnnotationDraftAPI(generics.RetrieveUpdateDestroyAPIView):
         PATCH=all_permissions.annotations_change,
         DELETE=all_permissions.annotations_delete,
     )
-    permission_classes = (IsAuthenticated, AnnotationsPermission)
+    permission_classes = (IsAuthenticated, AnnotationDraftPermission)
+
+    def perform_destroy(self, draft):
+        if not self.request.user.is_reset_super_user and draft.user_id != self.request.user.id:
+            raise PermissionDenied('You can only delete your own drafts.')
+        draft.delete()
 
 
 @method_decorator(

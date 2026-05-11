@@ -57,6 +57,23 @@ class AnnotationsPermission(BasePermission):
         return False
 
 
+class AnnotationDraftPermission(AnnotationsPermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method != 'DELETE':
+            return super().has_object_permission(request, view, obj)
+
+        if request.user.is_reset_super_user:
+            return True
+
+        return obj.user_id == request.user.id and obj.has_permission(request.user)
+
+    def has_permission(self, request, view):
+        if request.method == 'DELETE':
+            return True
+
+        return super().has_permission(request, view)
+
+
 class SuperUserPermission(BasePermission):
     def has_object_permission(self, request, view, obj):
         if ( request.method
