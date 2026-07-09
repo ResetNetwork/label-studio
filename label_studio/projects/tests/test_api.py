@@ -1,12 +1,17 @@
+from datetime import datetime
+from datetime import timezone as datetime_timezone
+
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlencode
+from freezegun import freeze_time
 from organizations.tests.factories import OrganizationFactory
+from projects.models import ProjectMember
 from projects.tests.factories import ProjectFactory
 from rest_framework.test import APIClient, APITestCase
-from tasks.models import Task
-from tasks.tests.factories import PredictionFactory, TaskFactory
+from tasks.models import Annotation, Task
+from tasks.tests.factories import AnnotationFactory, PredictionFactory, TaskFactory
 
 
 class TestProjectCountsListAPI(TestCase):
@@ -43,6 +48,73 @@ class TestProjectCountsListAPI(TestCase):
         ]
         actual = sorted(response.json()['results'], key=lambda d: d['id'])
         self.assertEqual(actual, expected)
+
+
+class TestWeeklyMetricsAPI(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.project = ProjectFactory()
+        cls.user = cls.project.created_by
+        ProjectMember.objects.get_or_create(user=cls.user, project=cls.project)
+        cls.task = TaskFactory(project=cls.project)
+
+    @staticmethod
+    def set_created_at(annotation, created_at):
+        Annotation.objects.filter(id=annotation.id).update(created_at=created_at)
+
+    def create_annotation(self, created_at, lead_time=60, was_cancelled=False):
+        annotation = AnnotationFactory(
+            task=self.task,
+            completed_by=self.user,
+            lead_time=lead_time,
+            was_cancelled=was_cancelled,
+            result=[{'value': {}}],
+        )
+        self.set_created_at(annotation, created_at)
+        return annotation
+
+    @freeze_time('2026-07-09T12:00:00Z')
+    def test_project_weekly_annotation_count_starts_monday_morning(self):
+        sunday = datetime(2026, 7, 5, 23, 59, tzinfo=datetime_timezone.utc)
+        monday = datetime(2026, 7, 6, 0, 0, tzinfo=datetime_timezone.utc)
+        tuesday = datetime(2026, 7, 7, 12, 0, tzinfo=datetime_timezone.utc)
+
+        self.create_annotation(sunday)
+        self.create_annotation(monday)
+        self.create_annotation(tuesday)
+        self.create_annotation(tuesday, was_cancelled=True)
+
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+        response = client.get(
+            reverse('projects:api:project-list'),
+            {
+                'ids': str(self.project.id),
+                'include': 'id,weekly_annotation_count',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['results'][0]['weekly_annotation_count'], 2)
+
+    @freeze_time('2026-07-09T12:00:00Z')
+    def test_user_metrics_week_starts_monday_morning(self):
+        sunday = datetime(2026, 7, 5, 23, 59, tzinfo=datetime_timezone.utc)
+        monday = datetime(2026, 7, 6, 0, 0, tzinfo=datetime_timezone.utc)
+        wednesday = datetime(2026, 7, 8, 12, 0, tzinfo=datetime_timezone.utc)
+
+        self.create_annotation(sunday, lead_time=3600)
+        self.create_annotation(monday, lead_time=1800)
+        self.create_annotation(wednesday, lead_time=900)
+
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+        response = client.get(reverse('projects:api:user-metrics'))
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['annotations_week'], 2)
+        self.assertEqual(data['total_time_week'], 0.8)
 
 
 class TestProjectModelVersionsAPI(APITestCase):

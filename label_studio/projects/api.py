@@ -3,7 +3,8 @@
 import logging
 import os
 import pathlib
-from datetime import datetime, timedelta
+from datetime import timedelta
+from typing import Dict, List, Union
 
 from core.feature_flags import flag_set
 from core.filters import ListFilter
@@ -18,23 +19,28 @@ from core.utils.io import find_dir, find_file, read_yaml
 from core.utils.serializer_to_openapi_params import serializer_to_openapi_params
 from data_manager.functions import filters_ordering_selected_items_exist, get_prepared_queryset
 from django.conf import settings
+from django.core.cache import cache
 from django.db import IntegrityError
-from django.db.models import F
+from django.db.models import Count, F, Q, Sum
+from django.db.models.functions import TruncDate
 from django.http import Http404
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django_filters import CharFilter, FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Case, FloatField, Value, When
-from django.db.models.functions import Cast
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from label_studio_sdk.label_interface.interface import LabelInterface
 from ml.serializers import MLBackendSerializer
-from projects.functions import annotate_finished_task_number, annotate_weekly_annotation_count
+from projects.functions import (
+    annotate_finished_task_number,
+    annotate_weekly_annotation_count,
+    current_monday_week_start,
+)
 from projects.functions.next_task import get_next_task
 from projects.functions.stream_history import get_label_stream_history
 from projects.functions.utils import recalculate_created_annotations_and_labels_from_scratch
-from projects.models import Project, ProjectImport, ProjectManager, ProjectReimport, ProjectSummary, ProjectMember
+from projects.models import Project, ProjectImport, ProjectManager, ProjectMember, ProjectReimport, ProjectSummary
 from projects.serializers import (
     GetFieldsSerializer,
     ProjectCountsSerializer,
@@ -47,11 +53,11 @@ from projects.serializers import (
     ProjectSummarySerializer,
 )
 from rest_framework import filters, generics, status
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import APIException, NotFound
 from rest_framework.exceptions import ValidationError as RestValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.views import exception_handler
@@ -66,13 +72,6 @@ from users.models import User
 from users.serializers import UserSimpleSerializer
 from webhooks.models import WebhookAction
 from webhooks.utils import api_webhook, api_webhook_for_delete, emit_webhooks_for_instance
-from django.utils import timezone
-from django.db.models import Avg, Count, DurationField, ExpressionWrapper, Q, Sum
-from django.db.models.functions import TruncDate
-from rest_framework.exceptions import APIException
-from core.redis import redis_connected
-from django.core.cache import cache
-from typing import Dict, Union, List
 
 from label_studio.core.utils.common import load_func
 
@@ -333,9 +332,9 @@ class ProjectListAPI(generics.ListCreateAPIView):
             )
 
         if 'weekly_annotation_count' in requested:
-            one_week_ago = timezone.now() - timedelta(days=7)
+            week_start = current_monday_week_start()
             assign(
-                Annotation.objects.filter(project_id__in=project_ids, created_at__gte=one_week_ago, was_cancelled=False)
+                Annotation.objects.filter(project_id__in=project_ids, created_at__gte=week_start, was_cancelled=False)
                 .values('project_id')
                 .annotate(count=Count('id')),
                 'weekly_annotation_count',
@@ -1140,7 +1139,7 @@ class UserMetricsAPI(generics.RetrieveAPIView):
         try:
             now = timezone.now()
             start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            week_ago = now - timedelta(days=7)
+            week_start = current_monday_week_start()
 
             # Base queryset with organization scope
             annotations = self.get_queryset().filter(completed_by_id=user_id)
@@ -1148,12 +1147,12 @@ class UserMetricsAPI(generics.RetrieveAPIView):
             # Get all counts in one query
             counts = annotations.aggregate(
                 today=Count('id', filter=Q(created_at__gte=start_of_today)),
-                week=Count('id', filter=Q(created_at__gte=week_ago)),
+                week=Count('id', filter=Q(created_at__gte=week_start)),
                 quarter=Count('id', filter=Q(created_at__gte=now - timedelta(days=90))),
                 projects_contributed=Count('project_id', distinct=True),
                 total_time_week=Sum(
                     'lead_time',
-                    filter=Q(created_at__gte=week_ago)
+                    filter=Q(created_at__gte=week_start)
                 )
             )
 
