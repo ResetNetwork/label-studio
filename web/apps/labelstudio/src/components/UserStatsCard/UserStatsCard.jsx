@@ -145,7 +145,7 @@ export const UserStatsCard = ({ projectKpis = [] }) => {
   const getMetricTooltip = (key) => {
     const tooltips = {
       annotations_today: 'Number of annotations you created today',
-      annotations_week: 'Number of annotations you created in the last 7 days',
+      annotations_week: 'Number of annotations you created since Monday morning',
       annotations_quarter: 'Number of annotations you created in the last 90 days',
       total_time_week: 'Total time spent annotating this week',
       avg_annotation_time: 'Average time spent per annotation (excluding top/bottom 10%)',
