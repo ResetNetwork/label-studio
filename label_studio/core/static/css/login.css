@@ -376,3 +376,27 @@ label {
 .text-wrapper a:hover {
   text-decoration: none;
 }
+
+@media (max-width: 768px) {
+  .login_page_new_ui {
+    min-height: 100dvh;
+  }
+
+  .login_page_new_ui .left {
+    display: none;
+  }
+
+  .login_page_new_ui .right {
+    min-width: 0;
+    height: auto;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
+  .form-wrapper {
+    width: min(100%, 22rem);
+    margin-top: 0;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+}

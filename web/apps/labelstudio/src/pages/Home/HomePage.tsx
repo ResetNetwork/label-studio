@@ -131,9 +131,9 @@ export const HomePage: Page = () => {
   };
 
   return (
-    <main className="p-6">
-      <div className="grid grid-cols-[minmax(0,1fr)_450px] gap-6">
-        <section className="flex flex-col gap-6">
+    <main className="p-4 sm:p-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_450px] gap-4 sm:gap-6">
+        <section className="flex min-w-0 flex-col gap-4 sm:gap-6">
           <div className="flex flex-col gap-1">
             <Typography variant="headline" size="small">
               Welcome 👋
@@ -142,14 +142,14 @@ export const HomePage: Page = () => {
               Let's get you started.
             </Typography>
           </div>
-          <div className="flex justify-start gap-4">
+          <div className="flex flex-col justify-start gap-3 sm:flex-row sm:gap-4">
             {actions.map((action) => {
               return (
                 <Button
                   key={action.title}
                   look="outlined"
                   align="center"
-                  className="flex-grow-0 text-16/24 gap-2 text-primary-content text-left min-w-[250px] [&_svg]:w-6 [&_svg]:h-6 pl-2"
+                  className="w-full min-w-0 flex-grow-0 text-16/24 gap-2 text-primary-content text-left sm:w-auto sm:min-w-[250px] [&_svg]:w-6 [&_svg]:h-6 pl-2"
                   onClick={handleActions(action.type)}
                   leading={<action.icon />}
                 >
@@ -205,7 +205,7 @@ export const HomePage: Page = () => {
             ) : null}
           </SimpleCard>
         </section>
-        <section className="flex flex-col gap-6">
+        <section className="flex min-w-0 flex-col gap-4 sm:gap-6">
           <HeidiTips collection="projectSettings" />
           <SimpleCard title="Resources" description="Learn, explore and get help" data-testid="resources-card">
             <ul>
@@ -256,7 +256,7 @@ function ProjectSimpleCard({ project }: { project: APIProject }) {
       data-external
     >
       <div
-        className="grid grid-cols-[minmax(0,1fr)_150px] p-2 py-3 items-center border-l-[3px]"
+        className="grid grid-cols-1 gap-2 p-2 py-3 items-center border-l-[3px] sm:grid-cols-[minmax(0,1fr)_150px]"
         style={{ borderLeftColor: color }}
       >
         <div className="flex flex-col gap-1">
