@@ -33,7 +33,6 @@ from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiRespo
 from label_studio_sdk.label_interface.interface import LabelInterface
 from ml.serializers import MLBackendSerializer
 from projects.functions import (
-    annotate_finished_task_number,
     annotate_weekly_annotation_count,
     current_monday_week_start,
 )
@@ -194,9 +193,8 @@ class ProjectListAPI(generics.ListCreateAPIView):
         # When the frontend requests per-project counters for a fixed `ids` list (Projects page),
         # avoid correlated subqueries per project. Counters are computed in bulk and injected in the serializer.
         if not (ids and include_counter_fields):
-            queryset = ProjectManager.with_counts_annotate(queryset, fields=fields)
-            if 'finished_task_number' in requested_fields:
-                queryset = annotate_finished_task_number(queryset)
+            if fields is None or requested_fields & set(ProjectManager.COUNTER_FIELDS):
+                queryset = ProjectManager.with_counts_annotate(queryset, fields=fields)
             if 'weekly_annotation_count' in requested_fields:
                 queryset = annotate_weekly_annotation_count(queryset)
 

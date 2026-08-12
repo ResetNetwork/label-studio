@@ -26,6 +26,12 @@ class TestProjectListAPI(APITestCase):
             organization=cls.matching_project.organization,
             created_by=cls.user,
         )
+        ProjectMember.objects.bulk_create(
+            [
+                ProjectMember(project=cls.matching_project, user=cls.user),
+                ProjectMember(project=cls.other_project, user=cls.user),
+            ]
+        )
 
     def setUp(self):
         self.client.force_authenticate(user=self.user)
