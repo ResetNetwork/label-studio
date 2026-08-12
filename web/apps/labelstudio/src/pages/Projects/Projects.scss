@@ -490,10 +490,15 @@
 
   @media (width < 640px) {
     &__menu .button-ls {
-      min-width: 44px;
-      min-height: 44px;
-      margin: -12px -6px -12px 0;
+      min-width: 48px;
+      min-height: 48px;
+      margin: -14px -6px -14px 0;
       opacity: 1;
+
+      &__icon {
+        width: 24px;
+        height: 24px;
+      }
     }
 
     &__annotation {
