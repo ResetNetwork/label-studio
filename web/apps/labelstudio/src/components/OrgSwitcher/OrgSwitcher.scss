@@ -7,7 +7,7 @@
   overflow: hidden;
   color: var(--sand_900);
   box-shadow: 0 4px 8px rgb(0 0 0 / 5%);
-  margin-bottom: 0px;
+  margin-bottom: 0;
   max-width: 260px;
   width: max-content;
   min-width: 200px;
@@ -28,6 +28,13 @@
       height: 20px;
       color: var(--sand_600);
     }
+  }
+
+  @media (width < 640px) {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    box-sizing: border-box;
   }
 }
 

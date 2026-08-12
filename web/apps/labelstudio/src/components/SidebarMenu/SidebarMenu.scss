@@ -27,4 +27,34 @@
     overflow: auto;
     padding: 2rem;
   }
+
+  @media (width < 640px) {
+    min-width: 0;
+    max-height: none;
+    flex-direction: column;
+
+    &__navigation {
+      width: 100%;
+      max-width: 100%;
+      flex-shrink: 0;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--color-neutral-border);
+
+      .main-menu {
+        width: max-content;
+        min-width: 100%;
+        flex: none;
+        flex-direction: row;
+        border-right: 0;
+      }
+    }
+
+    &__content {
+      width: 100%;
+      min-width: 0;
+      padding: 16px;
+      box-sizing: border-box;
+      overflow: visible;
+    }
+  }
 }

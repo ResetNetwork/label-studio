@@ -3,7 +3,6 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useUpdatePageTitle } from "@humansignal/core";
 import { HeidiTips } from "../../../components/HeidiTips/HeidiTips";
 import { modal } from "../../../components/Modal/Modal";
-import { Space } from "../../../components/Space/Space";
 import { cn } from "../../../utils/bem";
 import { FF_AUTH_TOKENS, FF_LSDV_E_297, isFF } from "../../../utils/feature-flags";
 import "./PeopleInvitation.scss";
@@ -61,12 +60,9 @@ export const PeoplePage = () => {
   return (
     <div className={cn("people").toClassName()}>
       <div className={cn("people").elem("controls").toClassName()}>
-        <Space spread>
-          <Space>
-            <OrgSwitcher />
-          </Space>
-
-          <Space>
+        <div className={cn("people").elem("controls-layout").toClassName()}>
+          <OrgSwitcher />
+          <div className={cn("people").elem("actions").toClassName()}>
             {isFF(FF_AUTH_TOKENS) && (
               <Button look="outlined" onClick={showApiTokenSettingsModal} aria-label="Show API token settings">
                 API Tokens Settings
@@ -79,8 +75,8 @@ export const PeoplePage = () => {
             >
               Add Members
             </Button>
-          </Space>
-        </Space>
+          </div>
+        </div>
       </div>
       <div className={cn("people").elem("content").toClassName()}>
         <PeopleList

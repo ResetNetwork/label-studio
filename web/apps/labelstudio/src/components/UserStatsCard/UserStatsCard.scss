@@ -3,6 +3,7 @@
 
 .user-stats {
   --user-stats-gap: 6px;
+
   background: var(--color-neutral-background);
   border-radius: 6px;
   border: 1px solid var(--color-neutral-border);
@@ -124,12 +125,38 @@
     align-self: stretch;
     margin: 0 4px;
   }
+
+  @media (width < 640px) {
+    min-width: 0;
+
+    &__content {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    &__metric {
+      min-width: 0;
+    }
+
+    &__value {
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    &__label {
+      white-space: normal;
+    }
+
+    &__divider {
+      display: none;
+    }
+  }
 }
 
 [data-theme='dark'] {
   .user-stats {
     background: var(--color-neutral-surface);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 30%);
 
     &__title {
       color: var(--color-neutral-content-subtler);
