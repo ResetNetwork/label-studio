@@ -92,13 +92,19 @@ const ProjectCard = ({ project }) => {
             >
               <Dropdown.Trigger
                 content={
-                  <Menu contextual>
+                  <Menu contextual className={cn("project-card").elem("actions-menu").toClassName()}>
                     <Menu.Item href={`/projects/${project.id}/settings`}>Settings</Menu.Item>
                     <Menu.Item href={`/projects/${project.id}/data?labeling=1`}>Label</Menu.Item>
                   </Menu>
                 }
               >
-                <Button size="smaller" look="string" aria-label="Project options">
+                <Button
+                  className={cn("project-card").elem("menu-button").toClassName()}
+                  size="small"
+                  look="outlined"
+                  variant="neutral"
+                  aria-label="Project actions"
+                >
                   <DotsThreeIcon />
                 </Button>
               </Dropdown.Trigger>
