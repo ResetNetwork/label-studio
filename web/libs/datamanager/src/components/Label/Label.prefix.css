@@ -127,4 +127,14 @@
     box-sizing: border-box;
     padding-bottom: 50px;
   }
+
+  @media (max-width: 640px) {
+    &__table {
+      display: none;
+    }
+
+    &__lsf-wrapper_mode_explorer {
+      margin-left: 0;
+    }
+  }
 }
