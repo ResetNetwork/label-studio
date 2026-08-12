@@ -3,6 +3,17 @@
     padding: 0 0 1rem;
   }
 
+  &__controls-layout,
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  &__controls-layout {
+    justify-content: space-between;
+  }
+
   &__content {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -13,5 +24,22 @@
 
   .heidy-tip {
     max-width: 450px;
+  }
+  @media (width < 640px) {
+    &__controls-layout,
+    &__actions {
+      align-items: stretch;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    &__actions .button-ls {
+      width: 100%;
+      min-height: 44px;
+    }
+
+    &__content {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 }

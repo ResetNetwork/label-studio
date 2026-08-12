@@ -722,6 +722,60 @@ div[class^="App_menu"] > div {
   box-shadow: 0 0 0 1.5px rgba(var(--color-accent-mango-base-raw) / 25%);
 }
 
+@media (width < 640px) {
+  .sidebar-menu__content > .wizard {
+    height: auto;
+    margin: -16px;
+  }
+
+  .wizard > .configure {
+    flex-direction: column;
+
+    > * {
+      width: 100%;
+      flex: none;
+    }
+  }
+
+  .wizard .configure__container {
+    grid-template-columns: minmax(0, 1fr) !important;
+    overflow: visible;
+
+    > div {
+      padding: 16px;
+
+      &:first-child {
+        height: auto;
+        min-height: calc(100vh - var(--header-height));
+      }
+    }
+
+    > :nth-child(2) {
+      height: 600px;
+      min-width: 0;
+
+      > [class*='handle'] {
+        display: none;
+      }
+    }
+  }
+
+  .wizard .configure__preview-container {
+    width: 100%;
+    min-width: 0;
+    height: 600px;
+    padding: 0 16px 16px;
+    box-sizing: border-box;
+    flex: none;
+  }
+
+  .wizard .configure__preview {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+
 :global(.CodeMirror-dialog-top) {
   border-bottom-color: var(--color-neutral-border);
   padding: var(--spacing-tight);

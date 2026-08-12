@@ -33,11 +33,18 @@ body {
 @media (width <= 760px) {
   /* phone */
   .editor {
-    width: 300px;
-    min-width: 300px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .wrapper_showingBottomBar {
+    --bottombar-height: 104px;
+  }
+
+  .main-view__annotation {
+    padding: var(--spacing-tight);
   }
 }
-
 .wrapper {
   flex: 1;
   display: grid;

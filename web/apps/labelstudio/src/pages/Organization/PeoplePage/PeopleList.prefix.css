@@ -106,4 +106,41 @@
       }
     }
   }
+
+  @media (width < 640px) {
+    min-width: 0;
+
+    &__header {
+      display: none;
+    }
+
+    &__user {
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr);
+      padding: 8px 0;
+    }
+
+    &__field {
+      width: auto !important;
+      height: auto;
+      min-width: 0;
+      padding: 3px 10px;
+      overflow-wrap: anywhere;
+
+      &.avatar {
+        grid-row: 1 / span 3;
+        align-items: flex-start;
+        padding-top: 6px;
+      }
+
+      &.name:empty {
+        display: none;
+      }
+
+      &.last-activity {
+        color: var(--color-neutral-content-subtler);
+        font-size: 13px;
+      }
+    }
+  }
 }

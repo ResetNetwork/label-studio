@@ -138,6 +138,27 @@
       justify-content: flex-end;
     }
   }
+
+  @media (width <= 640px) {
+    .controls {
+      width: 100%;
+      grid-auto-columns: minmax(0, 1fr);
+      padding: 0 8px;
+
+      > *,
+      &__tooltip-wrapper,
+      &__tooltip-wrapper > * {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .button,
+      .submit {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+  }
 }
 
 .submit-option {

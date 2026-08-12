@@ -168,3 +168,43 @@
     width: 488px;
   }
 }
+
+@media (width < 640px) {
+  .simple-settings,
+  .annotation-settings,
+  .general-settings,
+  .webhook {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .settings-wrapper {
+    width: auto;
+    max-width: 40rem;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
+  .general-settings {
+    flex-direction: column;
+
+    &__wrapper {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .heidy-tip {
+      margin: 24px 0 0;
+    }
+  }
+
+  .annotation-settings__wrapper {
+    width: auto;
+  }
+
+  .radio-group-ls:not(.radio-group-ls_simple) .radio-group-ls__buttons {
+    height: auto;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-flow: row;
+  }
+}
