@@ -132,4 +132,10 @@
       flex: 1;
     }
   }
+
+  @media (width <= 760px) {
+    &__wrapper {
+      display: none;
+    }
+  }
 }
