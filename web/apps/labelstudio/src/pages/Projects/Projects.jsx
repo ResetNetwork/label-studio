@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useParams as useRouterParams } from "react-router";
 import { Redirect } from "react-router-dom";
-import { Button, Dropdown, Space, Typography } from "@humansignal/ui";
+import { Button, Dropdown } from "@humansignal/ui";
 import { Oneof } from "../../components/Oneof/Oneof";
 import { Spinner } from "../../components/Spinner/Spinner";
 import { ApiContext } from "../../providers/ApiProvider";
@@ -223,7 +223,7 @@ export const ProjectsPage = () => {
                 />
               </div>
 
-              <Space>
+              <div className={cn("projects-page").elem("filters").toClassName()}>
                 <Button
                   look={activeOnly ? "primary" : "outlined"}
                   size="small"
@@ -259,7 +259,7 @@ export const ProjectsPage = () => {
                     {SORT_OPTIONS.find((o) => o.key === sortKey)?.label ?? "Sort"}
                   </Button>
                 </Dropdown.Trigger>
-              </Space>
+              </div>
             </div>
 
             <div className={cn("projects-page").elem("stats").toClassName()}>

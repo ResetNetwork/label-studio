@@ -6,7 +6,7 @@
     display: grid;
     justify-items: stretch;
     justify-content: space-between;
-    grid-template-columns: repeat(var(--column-count, 5), 1fr);
+    grid-template-columns: repeat(var(--column-count, 5), minmax(0, 1fr));
     grid-gap: var(--row-gap, 16px) 12px;
 
     &:not(:first-child) {

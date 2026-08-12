@@ -106,6 +106,42 @@
     border-radius: 50%;
     background: var(--primary_link);
   }
+
+  @media (width < 640px) {
+    &__trigger {
+      width: 48px;
+      min-width: 48px;
+      max-width: 48px;
+      padding: 0 12px;
+    }
+
+    &__logo,
+    &__hotkeys {
+      display: none;
+    }
+
+    &__context {
+      min-width: 0;
+      padding-left: 12px;
+      gap: 8px;
+    }
+
+    &__context-item {
+      min-width: 0;
+
+      &_left {
+        overflow: hidden;
+      }
+
+      &_right {
+        flex-shrink: 0;
+      }
+    }
+
+    &__user {
+      margin: 0 4px;
+    }
+  }
 }
 
 .newsletter-menu-item {

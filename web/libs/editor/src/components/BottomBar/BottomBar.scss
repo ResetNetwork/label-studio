@@ -35,4 +35,23 @@
       }
     }
   }
+
+  @media (width <= 640px) {
+    flex-direction: column;
+
+    &__group {
+      width: 100%;
+      min-width: 0;
+      flex: 0 0 52px;
+
+      &:first-child {
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+      }
+
+      &:last-child .bottombar__section {
+        flex: 1;
+      }
+    }
+  }
 }
