@@ -139,7 +139,7 @@
     }
   }
 
-  @media (width <= 640px) {
+  @media (width <= 760px) {
     .controls {
       width: 100%;
       grid-auto-columns: minmax(0, 1fr);
