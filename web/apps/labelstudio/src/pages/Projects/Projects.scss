@@ -305,17 +305,15 @@
   &__menu {
     margin-left: auto;
     flex-shrink: 0;
+  }
 
-    .button-ls {
-      margin-right: -6px;
-      opacity: 0.4;
+  &__menu-button {
+    margin-right: -6px;
+    opacity: 0.65;
 
-      --button-color: var(--text-color);
-
-      &__icon {
-        width: 16px;
-        height: 16px;
-      }
+    svg {
+      width: 18px;
+      height: 18px;
     }
   }
 
@@ -489,16 +487,24 @@
   }
 
   @media (width < 640px) {
-    &__menu .button-ls {
+    &__menu-button {
+      width: 48px;
       min-width: 48px;
+      height: 48px;
       min-height: 48px;
       margin: -14px -6px -14px 0;
       opacity: 1;
+      touch-action: manipulation;
 
-      &__icon {
+      svg {
         width: 24px;
         height: 24px;
       }
+    }
+
+    &__actions-menu .main-menu__item {
+      min-height: 44px;
+      padding: 10px 12px;
     }
 
     &__annotation {
