@@ -5,6 +5,7 @@ during development, and SHOULD NOT be used in a production setting.
 
 import mimetypes
 import posixpath
+import re
 from pathlib import Path
 
 from core.utils.manifest_assets import get_manifest_asset
@@ -27,6 +28,13 @@ def static_file_content_type_and_encoding(path: str) -> tuple[str, str | None]:
     if path.endswith('.mjs'):
         return 'text/javascript', encoding
     return 'application/octet-stream', encoding
+
+
+def static_file_cache_control(path: str, manifest_asset_prefix: str | None = None) -> str:
+    is_hashed_asset = re.search(r'\.[0-9a-f]{8,}\.', path)
+    if manifest_asset_prefix and not is_hashed_asset:
+        return 'no-cache'
+    return 'public, max-age=31536000, immutable'
 
 
 def serve(request, path, document_root=None, show_indexes=False, manifest_asset_prefix=None):
@@ -77,9 +85,9 @@ def serve(request, path, document_root=None, show_indexes=False, manifest_asset_
 
     response = RangedFileResponse(request, fullpath.open('rb'), content_type=content_type)
     response['Last-Modified'] = http_date(statobj.st_mtime)
-    # These assets are served with cache-busting query strings in templates (e.g. `?v=<commit>`),
-    # so allowing long-lived caching significantly improves perceived load time behind proxies.
-    response['Cache-Control'] = 'public, max-age=31536000, immutable'
+    # React entrypoints use cache-busting query strings, but dynamically loaded chunks do not.
+    # Revalidate this bundle so a deployment can never strand clients on stale numbered chunks.
+    response['Cache-Control'] = static_file_cache_control(path, manifest_asset_prefix)
     if encoding:
         response['Content-Encoding'] = encoding
     return response
