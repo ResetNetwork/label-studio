@@ -29,6 +29,7 @@ from label_studio_sdk.label_interface.control_tags import (
     TimeSeriesLabelsTag,
     VideoRectangleTag,
 )
+from organizations.serializers import OrganizationMemberValidationSerializer
 from projects.models import Project, ProjectImport, ProjectOnboarding, ProjectReimport, ProjectSummary
 from rest_flex_fields import FlexFieldsModelSerializer
 from rest_framework import serializers
@@ -37,22 +38,13 @@ from tasks.models import Task
 from users.serializers import UserSimpleSerializer
 
 
-class ProjectMemberSyncSerializer(serializers.Serializer):
+class ProjectMemberSyncSerializer(OrganizationMemberValidationSerializer):
     project_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), allow_empty=False)
-    emails = serializers.ListField(child=serializers.EmailField(), allow_empty=False)
 
     def validate_project_ids(self, project_ids):
         if len(project_ids) != len(set(project_ids)):
             raise serializers.ValidationError('Project IDs must be unique.')
         return project_ids
-
-    def validate_emails(self, emails):
-        if any(email != email.strip().lower() for email in emails):
-            raise serializers.ValidationError('Emails must be lowercase without surrounding whitespace.')
-        if len(emails) != len(set(emails)):
-            raise serializers.ValidationError('Emails must be unique.')
-        return emails
-
 
 @extend_schema_field({'type': 'object', 'additionalProperties': True})
 class OpenApiObjectJSONField(serializers.JSONField):

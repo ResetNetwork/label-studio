@@ -17,6 +17,7 @@ _urlpatterns = [
 _api_urlpattens = [
     # organization list viewset
     path('', api.OrganizationListAPI.as_view(), name='organization-list'),
+    path('members/validate/', api.OrganizationMemberValidationAPI.as_view(), name='organization-members-validate'),
     # organization detail viewset
     path('<int:pk>', api.OrganizationAPI.as_view(), name='organization-detail'),
     # organization memberships list viewset

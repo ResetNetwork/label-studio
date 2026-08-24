@@ -40,6 +40,17 @@ class OrganizationMemberListParamsSerializer(serializers.Serializer):
     contributed_to_projects = serializers.BooleanField(required=False, default=False)
 
 
+class OrganizationMemberValidationSerializer(serializers.Serializer):
+    emails = serializers.ListField(child=serializers.EmailField(), allow_empty=False)
+
+    def validate_emails(self, emails):
+        if any(email != email.strip().lower() for email in emails):
+            raise serializers.ValidationError('Emails must be lowercase without surrounding whitespace.')
+        if len(emails) != len(set(emails)):
+            raise serializers.ValidationError('Emails must be unique.')
+        return emails
+
+
 @extend_schema_serializer(
     deprecate_fields=[
         'created_projects',
