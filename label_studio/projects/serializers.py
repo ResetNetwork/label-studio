@@ -37,6 +37,17 @@ from tasks.models import Task
 from users.serializers import UserSimpleSerializer
 
 
+class ProjectMemberSyncSerializer(serializers.Serializer):
+    emails = serializers.ListField(child=serializers.EmailField(), allow_empty=False)
+
+    def validate_emails(self, emails):
+        if any(email != email.strip().lower() for email in emails):
+            raise serializers.ValidationError('Emails must be lowercase without surrounding whitespace.')
+        if len(emails) != len(set(emails)):
+            raise serializers.ValidationError('Emails must be unique.')
+        return emails
+
+
 @extend_schema_field({'type': 'object', 'additionalProperties': True})
 class OpenApiObjectJSONField(serializers.JSONField):
     """

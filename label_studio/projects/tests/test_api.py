@@ -12,6 +12,7 @@ from projects.tests.factories import ProjectFactory
 from rest_framework.test import APIClient, APITestCase
 from tasks.models import Annotation, Task
 from tasks.tests.factories import AnnotationFactory, PredictionFactory, TaskFactory
+from users.tests.factories import UserFactory
 
 
 class TestProjectCountsListAPI(TestCase):
@@ -210,3 +211,85 @@ class TestCrossOrganizationProjectAccessAPI(APITestCase):
         assert response.status_code == 404
         project.refresh_from_db()
         assert project.title != 'changed'
+
+
+class TestProjectMembersAPI(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.organization = OrganizationFactory()
+        cls.owner = cls.organization.created_by
+        cls.project = ProjectFactory(organization=cls.organization)
+        ProjectMember.objects.create(project=cls.project, user=cls.owner)
+        cls.member = UserFactory(email='member@example.com', active_organization=cls.organization)
+        cls.outsider = UserFactory(email='outsider@example.com')
+
+    def get_url(self):
+        return reverse('projects:api:project-members', kwargs={'pk': self.project.id})
+
+    def test_enables_active_organization_members_idempotently(self):
+        ProjectMember.objects.create(project=self.project, user=self.member, enabled=False)
+        self.client.force_authenticate(user=self.owner)
+        payload = {'emails': [self.owner.email, self.member.email]}
+
+        first_response = self.client.post(self.get_url(), payload, format='json')
+        second_response = self.client.post(self.get_url(), payload, format='json')
+
+        assert first_response.status_code == 200
+        assert second_response.status_code == 200
+        assert first_response.json() == {
+            'project_id': self.project.id,
+            'members': [
+                {'email': self.owner.email, 'user_id': self.owner.id},
+                {'email': self.member.email, 'user_id': self.member.id},
+            ],
+        }
+        memberships = ProjectMember.objects.filter(project=self.project, user__in=[self.owner, self.member])
+        assert memberships.count() == 2
+        assert all(membership.enabled for membership in memberships)
+
+    def test_rejects_non_members_before_changing_any_membership(self):
+        membership = ProjectMember.objects.create(project=self.project, user=self.member, enabled=False)
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            self.get_url(),
+            {'emails': [self.member.email, self.outsider.email]},
+            format='json',
+        )
+
+        assert response.status_code == 400
+        assert self.outsider.email in str(response.json())
+        membership.refresh_from_db()
+        assert membership.enabled is False
+        assert not ProjectMember.objects.filter(project=self.project, user=self.outsider).exists()
+
+    def test_rejects_duplicate_or_noncanonical_emails(self):
+        self.client.force_authenticate(user=self.owner)
+
+        duplicate_response = self.client.post(
+            self.get_url(),
+            {'emails': [self.member.email, self.member.email]},
+            format='json',
+        )
+        noncanonical_response = self.client.post(
+            self.get_url(),
+            {'emails': [self.member.email.upper()]},
+            format='json',
+        )
+
+        assert duplicate_response.status_code == 400
+        assert noncanonical_response.status_code == 400
+
+    def test_rejects_project_outside_active_organization(self):
+        other_organization = OrganizationFactory()
+        other_project = ProjectFactory(organization=other_organization)
+        ProjectMember.objects.create(project=other_project, user=self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            reverse('projects:api:project-members', kwargs={'pk': other_project.id}),
+            {'emails': [self.owner.email]},
+            format='json',
+        )
+
+        assert response.status_code == 404
