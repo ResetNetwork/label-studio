@@ -220,16 +220,19 @@ class TestProjectMembersAPI(APITestCase):
         cls.owner = cls.organization.created_by
         cls.project = ProjectFactory(organization=cls.organization)
         ProjectMember.objects.create(project=cls.project, user=cls.owner)
+        cls.second_project = ProjectFactory(organization=cls.organization)
+        ProjectMember.objects.create(project=cls.second_project, user=cls.owner)
         cls.member = UserFactory(email='member@example.com', active_organization=cls.organization)
         cls.outsider = UserFactory(email='outsider@example.com')
 
     def get_url(self):
-        return reverse('projects:api:project-members', kwargs={'pk': self.project.id})
+        return reverse('projects:api:project-members')
 
-    def test_enables_active_organization_members_idempotently(self):
+    def test_enables_active_organization_members_on_projects_idempotently(self):
         ProjectMember.objects.create(project=self.project, user=self.member, enabled=False)
         self.client.force_authenticate(user=self.owner)
-        payload = {'emails': [self.owner.email, self.member.email]}
+        project_ids = [self.project.id, self.second_project.id]
+        payload = {'project_ids': project_ids, 'emails': [self.owner.email, self.member.email]}
 
         first_response = self.client.post(self.get_url(), payload, format='json')
         second_response = self.client.post(self.get_url(), payload, format='json')
@@ -237,14 +240,17 @@ class TestProjectMembersAPI(APITestCase):
         assert first_response.status_code == 200
         assert second_response.status_code == 200
         assert first_response.json() == {
-            'project_id': self.project.id,
+            'project_ids': project_ids,
             'members': [
                 {'email': self.owner.email, 'user_id': self.owner.id},
                 {'email': self.member.email, 'user_id': self.member.id},
             ],
         }
-        memberships = ProjectMember.objects.filter(project=self.project, user__in=[self.owner, self.member])
-        assert memberships.count() == 2
+        memberships = ProjectMember.objects.filter(
+            project__in=[self.project, self.second_project],
+            user__in=[self.owner, self.member],
+        )
+        assert memberships.count() == 4
         assert all(membership.enabled for membership in memberships)
 
     def test_rejects_non_members_before_changing_any_membership(self):
@@ -253,7 +259,10 @@ class TestProjectMembersAPI(APITestCase):
 
         response = self.client.post(
             self.get_url(),
-            {'emails': [self.member.email, self.outsider.email]},
+            {
+                'project_ids': [self.project.id, self.second_project.id],
+                'emails': [self.member.email, self.outsider.email],
+            },
             format='json',
         )
 
@@ -263,33 +272,36 @@ class TestProjectMembersAPI(APITestCase):
         assert membership.enabled is False
         assert not ProjectMember.objects.filter(project=self.project, user=self.outsider).exists()
 
-    def test_rejects_duplicate_or_noncanonical_emails(self):
+    def test_rejects_duplicate_projects_or_noncanonical_emails(self):
         self.client.force_authenticate(user=self.owner)
 
-        duplicate_response = self.client.post(
+        duplicate_projects_response = self.client.post(
             self.get_url(),
-            {'emails': [self.member.email, self.member.email]},
+            {'project_ids': [self.project.id, self.project.id], 'emails': [self.member.email]},
             format='json',
         )
         noncanonical_response = self.client.post(
             self.get_url(),
-            {'emails': [self.member.email.upper()]},
+            {'project_ids': [self.project.id], 'emails': [self.member.email.upper()]},
             format='json',
         )
 
-        assert duplicate_response.status_code == 400
+        assert duplicate_projects_response.status_code == 400
         assert noncanonical_response.status_code == 400
 
     def test_rejects_project_outside_active_organization(self):
         other_organization = OrganizationFactory()
         other_project = ProjectFactory(organization=other_organization)
         ProjectMember.objects.create(project=other_project, user=self.owner)
+        membership = ProjectMember.objects.create(project=self.project, user=self.member, enabled=False)
         self.client.force_authenticate(user=self.owner)
 
         response = self.client.post(
-            reverse('projects:api:project-members', kwargs={'pk': other_project.id}),
-            {'emails': [self.owner.email]},
+            self.get_url(),
+            {'project_ids': [self.project.id, other_project.id], 'emails': [self.member.email]},
             format='json',
         )
 
         assert response.status_code == 404
+        membership.refresh_from_db()
+        assert membership.enabled is False

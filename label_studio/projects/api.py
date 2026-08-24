@@ -1088,8 +1088,8 @@ class ProjectAnnotatorsAPI(generics.RetrieveAPIView):
 
 @extend_schema(
     tags=['Projects'],
-    summary='Enable project members',
-    description='Enable active members of the project organization by canonical email address.',
+    summary='Enable members on projects',
+    description='Atomically enable active organization members on projects by canonical email address.',
     request=ProjectMemberSyncSerializer,
     extensions={
         'x-fern-sdk-group-name': 'projects',
@@ -1109,15 +1109,21 @@ class ProjectMembersAPI(generics.GenericAPIView):
         )
 
     def post(self, request, *args, **kwargs):
-        project = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        project_ids = serializer.validated_data['project_ids']
         emails = serializer.validated_data['emails']
 
         with transaction.atomic():
-            project = Project.objects.select_for_update().get(pk=project.pk)
+            projects = list(
+                self.get_queryset().select_for_update().filter(pk__in=project_ids).order_by('pk')
+            )
+            if {project.id for project in projects} != set(project_ids):
+                raise Http404
+
+            organization = projects[0].organization
             organization_members = OrganizationMember.objects.filter(
-                organization=project.organization,
+                organization=organization,
                 deleted_at__isnull=True,
                 user__is_active=True,
                 user__email__in=emails,
@@ -1127,21 +1133,22 @@ class ProjectMembersAPI(generics.GenericAPIView):
             if missing_emails:
                 raise RestValidationError(
                     {
-                        'emails': f'Not active members of organization {project.organization.title}: {", ".join(missing_emails)}'
+                        'emails': f'Not active members of organization {organization.title}: {", ".join(missing_emails)}'
                     }
                 )
 
-            for email in emails:
-                user = users_by_email[email]
-                memberships = ProjectMember.objects.select_for_update().filter(project=project, user=user)
-                if memberships.exists():
-                    memberships.update(enabled=True, updated_at=timezone.now())
-                else:
-                    ProjectMember.objects.create(project=project, user=user, enabled=True)
+            for project in projects:
+                for email in emails:
+                    user = users_by_email[email]
+                    memberships = ProjectMember.objects.select_for_update().filter(project=project, user=user)
+                    if memberships.exists():
+                        memberships.update(enabled=True, updated_at=timezone.now())
+                    else:
+                        ProjectMember.objects.create(project=project, user=user, enabled=True)
 
         return Response(
             {
-                'project_id': project.id,
+                'project_ids': project_ids,
                 'members': [{'email': email, 'user_id': users_by_email[email].id} for email in emails],
             }
         )

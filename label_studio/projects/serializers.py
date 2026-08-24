@@ -38,7 +38,13 @@ from users.serializers import UserSimpleSerializer
 
 
 class ProjectMemberSyncSerializer(serializers.Serializer):
+    project_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), allow_empty=False)
     emails = serializers.ListField(child=serializers.EmailField(), allow_empty=False)
+
+    def validate_project_ids(self, project_ids):
+        if len(project_ids) != len(set(project_ids)):
+            raise serializers.ValidationError('Project IDs must be unique.')
+        return project_ids
 
     def validate_emails(self, emails):
         if any(email != email.strip().lower() for email in emails):
