@@ -125,3 +125,46 @@ class TestOrganizationMemberListAPI(APITestCase):
                 'title': project_2.title,
             }
         ]
+
+
+class TestOrganizationMemberValidationAPI(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.organization = OrganizationFactory()
+        cls.owner = cls.organization.created_by
+        cls.member = UserFactory(email='member@example.com', active_organization=cls.organization)
+        cls.inactive_member = UserFactory(
+            email='inactive@example.com',
+            active_organization=cls.organization,
+            is_active=False,
+        )
+
+    def test_validates_active_members_in_request_order(self):
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            '/api/organizations/members/validate/',
+            {'emails': [self.member.email, self.owner.email]},
+            format='json',
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            'members': [
+                {'email': self.member.email, 'user_id': self.member.id},
+                {'email': self.owner.email, 'user_id': self.owner.id},
+            ]
+        }
+
+    def test_rejects_missing_or_inactive_members(self):
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            '/api/organizations/members/validate/',
+            {'emails': ['missing@example.com', self.inactive_member.email]},
+            format='json',
+        )
+
+        assert response.status_code == 400
+        assert 'missing@example.com' in str(response.json())
+        assert self.inactive_member.email in str(response.json())

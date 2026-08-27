@@ -20,7 +20,7 @@ from core.utils.serializer_to_openapi_params import serializer_to_openapi_params
 from data_manager.functions import filters_ordering_selected_items_exist, get_prepared_queryset
 from django.conf import settings
 from django.core.cache import cache
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
 from django.http import Http404
@@ -32,6 +32,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from label_studio_sdk.label_interface.interface import LabelInterface
 from ml.serializers import MLBackendSerializer
+from organizations.models import OrganizationMember
 from projects.functions import (
     annotate_finished_task_number,
     annotate_weekly_annotation_count,
@@ -46,6 +47,7 @@ from projects.serializers import (
     ProjectCountsSerializer,
     ProjectImportSerializer,
     ProjectLabelConfigSerializer,
+    ProjectMemberSyncSerializer,
     ProjectModelVersionExtendedSerializer,
     ProjectModelVersionParamsSerializer,
     ProjectReimportSerializer,
@@ -1082,6 +1084,75 @@ class ProjectAnnotatorsAPI(generics.RetrieveAPIView):
         users = User.objects.filter(id__in=annotator_ids).prefetch_related('om_through').order_by('id')
         data = UserSimpleSerializer(users, many=True, context={'request': request}).data
         return Response(data)
+
+
+@extend_schema(
+    tags=['Projects'],
+    summary='Enable members on projects',
+    description='Atomically enable active organization members on projects by canonical email address.',
+    request=ProjectMemberSyncSerializer,
+    extensions={
+        'x-fern-sdk-group-name': 'projects',
+        'x-fern-sdk-method-name': 'enable_members',
+        'x-fern-audiences': ['public'],
+    },
+)
+class ProjectMembersAPI(generics.GenericAPIView):
+    parser_classes = (JSONParser,)
+    serializer_class = ProjectMemberSyncSerializer
+    permission_required = all_permissions.projects_change
+
+    def get_queryset(self):
+        return Project.objects.filter(
+            organization=self.request.user.active_organization,
+            members__user=self.request.user,
+        )
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        project_ids = serializer.validated_data['project_ids']
+        emails = serializer.validated_data['emails']
+
+        with transaction.atomic():
+            projects = list(
+                self.get_queryset().select_for_update().filter(pk__in=project_ids).order_by('pk')
+            )
+            if {project.id for project in projects} != set(project_ids):
+                raise Http404
+
+            organization = projects[0].organization
+            organization_members = OrganizationMember.objects.filter(
+                organization=organization,
+                deleted_at__isnull=True,
+                user__is_active=True,
+                user__email__in=emails,
+            ).select_related('user')
+            users_by_email = {membership.user.email: membership.user for membership in organization_members}
+            missing_emails = [email for email in emails if email not in users_by_email]
+            if missing_emails:
+                raise RestValidationError(
+                    {
+                        'emails': f'Not active members of organization {organization.title}: {", ".join(missing_emails)}'
+                    }
+                )
+
+            for project in projects:
+                for email in emails:
+                    user = users_by_email[email]
+                    memberships = ProjectMember.objects.select_for_update().filter(project=project, user=user)
+                    if memberships.exists():
+                        memberships.update(enabled=True, updated_at=timezone.now())
+                    else:
+                        ProjectMember.objects.create(project=project, user=user, enabled=True)
+
+        return Response(
+            {
+                'project_ids': project_ids,
+                'members': [{'email': email, 'user_id': users_by_email[email].id} for email in emails],
+            }
+        )
+
 
 @extend_schema(
     tags=['Users'],

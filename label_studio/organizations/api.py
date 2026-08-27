@@ -6,6 +6,7 @@ from core.feature_flags import flag_set
 from core.mixins import GetParentObjectMixin
 from core.utils.common import load_func
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
@@ -18,11 +19,13 @@ from organizations.serializers import (
     OrganizationMemberListParamsSerializer,
     OrganizationMemberListSerializer,
     OrganizationMemberSerializer,
+    OrganizationMemberValidationSerializer,
     OrganizationSerializer,
 )
 from projects.models import Project
 from rest_framework import generics, status
 from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import ValidationError as RestValidationError
 from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -31,11 +34,9 @@ from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 from tasks.models import Annotation
-from users.models import User
-from django.contrib.auth import get_user_model
 
-from label_studio.core.permissions import ViewClassPermission, all_permissions
 from label_studio.core.api_permissions import SuperUserInvitePermission
+from label_studio.core.permissions import ViewClassPermission, all_permissions
 from label_studio.core.utils.params import bool_from_request
 
 logger = logging.getLogger(__name__)
@@ -213,6 +214,47 @@ class OrganizationMemberListAPI(generics.ListAPIView):
         page = self.paginated_members   # Using cached property to avoid multiple queries
         serializer = self.get_serializer(page, many=True)
         return self.get_paginated_response(serializer.data)
+
+
+@extend_schema(
+    tags=['Organizations'],
+    summary='Validate active organization members',
+    description='Validate canonical email addresses against active members of the caller active organization.',
+    request=OrganizationMemberValidationSerializer,
+    extensions={
+        'x-fern-sdk-group-name': ['organizations', 'members'],
+        'x-fern-sdk-method-name': 'validate',
+        'x-fern-audiences': ['public'],
+    },
+)
+class OrganizationMemberValidationAPI(generics.GenericAPIView):
+    parser_classes = (JSONParser,)
+    serializer_class = OrganizationMemberValidationSerializer
+    permission_required = all_permissions.organizations_view
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        emails = serializer.validated_data['emails']
+        organization = request.user.active_organization
+        memberships = OrganizationMember.objects.filter(
+            organization=organization,
+            deleted_at__isnull=True,
+            user__is_active=True,
+            user__email__in=emails,
+        ).select_related('user')
+        users_by_email = {membership.user.email: membership.user for membership in memberships}
+        missing_emails = [email for email in emails if email not in users_by_email]
+        if missing_emails:
+            raise RestValidationError(
+                {
+                    'emails': f'Not active members of organization {organization.title}: {", ".join(missing_emails)}'
+                }
+            )
+
+        return Response(
+            {'members': [{'email': email, 'user_id': users_by_email[email].id} for email in emails]}
+        )
 
 
 @method_decorator(
